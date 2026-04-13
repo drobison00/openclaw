@@ -14,6 +14,8 @@ Docs: https://docs.openclaw.ai
 - Context engines: reject resolved plugin engines whose reported `info.id` does not match their registered slot id, so malformed engines fail fast before id-based runtime branches can misbehave. (#63222) Thanks @fuller-stack-dev.
 - WhatsApp: patch installed Baileys media encryption writes during OpenClaw postinstall so the default npm/install.sh delivery path waits for encrypted media files to finish flushing before readback, avoiding transient `ENOENT` crashes on image sends. (#65896) Thanks @frankekn.
 - Gateway/update: unify service entrypoint resolution around the canonical bundled gateway entrypoint so update, reinstall, and doctor repair stop drifting between stale `dist/entry.js` and current `dist/index.js` paths. (#65984) Thanks @mbelinky.
+- Exec/safe bins: resolve GNU-style long-option abbreviations to their canonical flags before checking safe-bin deny rules, so abbreviated forms like `sort --comp=...` and `wc --files0-fro=...` are rejected consistently.
+
 ## 2026.4.12
 
 ### Changes
