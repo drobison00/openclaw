@@ -192,6 +192,63 @@ describe("resolveCommandAuthorization", () => {
     expect(otherAuth.isAuthorizedSender).toBe(false);
   });
 
+  it("requires owner identity when a plugin enforces owner-only commands and allowFrom is wildcard", () => {
+    setActivePluginRegistry(
+      createTestRegistry([
+        {
+          pluginId: "whatsapp",
+          plugin: {
+            ...createOutboundTestPlugin({
+              id: "whatsapp",
+              outbound: { deliveryMode: "direct" },
+            }),
+            commands: {
+              enforceOwnerForCommands: true,
+              preferSenderE164ForCommands: true,
+              skipWhenConfigEmpty: true,
+            },
+            config: {
+              listAccountIds: () => [],
+              resolveAllowFrom: ({ cfg }: { cfg: Record<string, unknown> }) => {
+                const channels =
+                  cfg.channels && typeof cfg.channels === "object"
+                    ? (cfg.channels as Record<string, unknown>)
+                    : undefined;
+                const whatsapp =
+                  channels?.whatsapp && typeof channels.whatsapp === "object"
+                    ? (channels.whatsapp as Record<string, unknown>)
+                    : undefined;
+                return Array.isArray(whatsapp?.allowFrom) ? whatsapp.allowFrom : undefined;
+              },
+              formatAllowFrom: ({ allowFrom }: { allowFrom: Array<string | number> }) =>
+                allowFrom.map((entry) => String(entry).trim()).filter(Boolean),
+            },
+          },
+          source: "test",
+        },
+      ]),
+    );
+
+    const cfg = {
+      channels: { whatsapp: { allowFrom: ["*"] } },
+    } as OpenClawConfig;
+
+    const auth = resolveCommandAuthorization({
+      ctx: {
+        Provider: "whatsapp",
+        Surface: "whatsapp",
+        ChatType: "direct",
+        From: "whatsapp:+19995551234",
+        SenderE164: "+19995551234",
+      } as MsgContext,
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(auth.senderIsOwner).toBe(false);
+    expect(auth.isAuthorizedSender).toBe(false);
+  });
+
   it("uses owner allowlist override from context when configured", () => {
     setActivePluginRegistry(
       createTestRegistry([

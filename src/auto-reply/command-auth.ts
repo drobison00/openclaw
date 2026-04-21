@@ -706,9 +706,11 @@ export function resolveCommandAuthorization(params: {
       ? true
       : ownerAllowlistConfigured
         ? senderIsOwner
-        : ownerState.allowAll ||
-          ownerState.ownerCandidatesForCommands.length === 0 ||
-          Boolean(matchedCommandOwner);
+        : enforceOwner
+          ? Boolean(matchedCommandOwner)
+          : ownerState.allowAll ||
+            ownerState.ownerCandidatesForCommands.length === 0 ||
+            Boolean(matchedCommandOwner);
   const isAuthorizedSender = resolveCommandSenderAuthorization({
     commandAuthorized,
     isOwnerForCommands,
