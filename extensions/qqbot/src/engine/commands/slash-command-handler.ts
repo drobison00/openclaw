@@ -5,7 +5,9 @@
  * Handles urgent commands, normal slash commands, and file delivery.
  */
 
+import { resolveQQBotAccess } from "../access/index.js";
 import type { QueuedMessage } from "../gateway/message-queue.js";
+import { resolveCommandAuthorized } from "../gateway/stages/access-stage.js";
 import type { GatewayAccount, EngineLogger } from "../gateway/types.js";
 import { sendDocument } from "../messaging/outbound.js";
 import {
@@ -61,6 +63,15 @@ export async function trySlashCommand(
   // Normal slash command — try to match and execute.
   const receivedAt = Date.now();
   const peerId = ctx.getMessagePeerId(msg);
+  const isGroupChat = msg.type === "guild" || msg.type === "group";
+  const access = resolveQQBotAccess({
+    isGroup: isGroupChat,
+    senderId: msg.senderId,
+    allowFrom: account.config?.allowFrom,
+    groupAllowFrom: account.config?.groupAllowFrom,
+    dmPolicy: account.config?.dmPolicy,
+    groupPolicy: account.config?.groupPolicy,
+  });
   const cmdCtx: SlashCommandContext = {
     type: msg.type,
     senderId: msg.senderId,
@@ -75,7 +86,7 @@ export async function trySlashCommand(
     accountId: account.accountId,
     appId: account.appId,
     accountConfig: account.config,
-    commandAuthorized: true,
+    commandAuthorized: resolveCommandAuthorized(access),
     queueSnapshot: ctx.getQueueSnapshot(peerId),
   };
 

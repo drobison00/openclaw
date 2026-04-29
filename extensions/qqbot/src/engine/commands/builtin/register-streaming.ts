@@ -30,6 +30,7 @@ export function registerStreamingCommands(registry: SlashCommandRegistry): void 
   registry.register({
     name: "bot-streaming",
     description: "一键开关流式消息",
+    requireAuth: true,
     usage: [
       `/bot-streaming on     开启流式消息`,
       `/bot-streaming off    关闭流式消息`,

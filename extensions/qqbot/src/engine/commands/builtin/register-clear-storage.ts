@@ -96,6 +96,7 @@ export function registerClearStorageCommands(registry: SlashCommandRegistry): vo
   registry.register({
     name: "bot-clear-storage",
     description: "清理通过 QQBot 对话产生的下载文件，释放主机磁盘空间",
+    requireAuth: true,
     usage: [
       `/bot-clear-storage`,
       ``,
