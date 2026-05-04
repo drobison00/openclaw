@@ -50,6 +50,17 @@ type NodeApprovalAnalysis = {
   inlineEvalHit: InterpreterInlineEvalHit | null;
 };
 
+function buildNodeAllowlistAnalysisEnv(
+  targetEnv: Record<string, string> | undefined,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = targetEnv ? { ...targetEnv } : {};
+  // Node execution blocks PATH overrides before merging with the node-local
+  // process env. Do not let gateway PATH resolution satisfy a node allowlist.
+  env.PATH = "";
+  env.Path = "";
+  return env;
+}
+
 export function shouldSkipNodeApprovalPrepare(params: {
   hostSecurity: ExecSecurity;
   hostAsk: ExecAsk;
@@ -280,12 +291,13 @@ export async function analyzeNodeApprovalRequirement(params: {
   hostSecurity: ExecSecurity;
   hostAsk: ExecAsk;
 }): Promise<NodeApprovalAnalysis> {
+  const analysisEnv = buildNodeAllowlistAnalysisEnv(params.target.env);
   const baseAllowlistEval = evaluateShellAllowlist({
-    command: params.request.command,
+    command: params.prepared.rawCommand,
     allowlist: [],
     safeBins: new Set(),
-    cwd: params.request.workdir,
-    env: params.request.env,
+    cwd: params.prepared.cwd,
+    env: analysisEnv,
     platform: params.target.platform,
     trustedSafeBinDirs: params.request.trustedSafeBinDirs,
   });
@@ -322,11 +334,11 @@ export async function analyzeNodeApprovalRequirement(params: {
         });
         // Allowlist-only precheck; safe bins are node-local and may diverge.
         const allowlistEval = evaluateShellAllowlist({
-          command: params.request.command,
+          command: params.prepared.rawCommand,
           allowlist: resolved.allowlist,
           safeBins: new Set(),
-          cwd: params.request.workdir,
-          env: params.request.env,
+          cwd: params.prepared.cwd,
+          env: analysisEnv,
           platform: params.target.platform,
           trustedSafeBinDirs: params.request.trustedSafeBinDirs,
         });

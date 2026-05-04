@@ -25,6 +25,16 @@ const preparedPlan = vi.hoisted(() => ({
 }));
 
 const callGatewayToolMock = vi.hoisted(() => vi.fn());
+const evaluateShellAllowlistMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    allowlistMatches: [],
+    analysisOk: true,
+    allowlistSatisfied: false,
+    segments: [{ resolution: null, argv: ["bun", "./script.ts"] }],
+    segmentAllowlistEntries: [],
+  })),
+);
+const hasDurableExecApprovalMock = vi.hoisted(() => vi.fn(() => false));
 const listNodesMock = vi.hoisted(() => vi.fn());
 const parsePreparedSystemRunPayloadMock = vi.hoisted(() => vi.fn());
 const requiresExecApprovalMock = vi.hoisted(() => vi.fn(() => true));
@@ -76,14 +86,8 @@ const detectInterpreterInlineEvalArgvMock = vi.hoisted(() =>
 );
 
 vi.mock("../infra/exec-approvals.js", () => ({
-  evaluateShellAllowlist: vi.fn(() => ({
-    allowlistMatches: [],
-    analysisOk: true,
-    allowlistSatisfied: false,
-    segments: [{ resolution: null, argv: ["bun", "./script.ts"] }],
-    segmentAllowlistEntries: [],
-  })),
-  hasDurableExecApproval: vi.fn(() => false),
+  evaluateShellAllowlist: evaluateShellAllowlistMock,
+  hasDurableExecApproval: hasDurableExecApprovalMock,
   requiresExecApproval: requiresExecApprovalMock,
   resolveExecApprovalAllowedDecisions: vi.fn(() => ["allow-once", "allow-always", "deny"]),
   resolveExecApprovalsFromFile: vi.fn(() => ({
@@ -201,6 +205,16 @@ describe("executeNodeHostCommand", () => {
     ]);
     parsePreparedSystemRunPayloadMock.mockReset();
     parsePreparedSystemRunPayloadMock.mockReturnValue({ plan: preparedPlan });
+    evaluateShellAllowlistMock.mockReset();
+    evaluateShellAllowlistMock.mockReturnValue({
+      allowlistMatches: [],
+      analysisOk: true,
+      allowlistSatisfied: false,
+      segments: [{ resolution: null, argv: ["bun", "./script.ts"] }],
+      segmentAllowlistEntries: [],
+    });
+    hasDurableExecApprovalMock.mockReset();
+    hasDurableExecApprovalMock.mockReturnValue(false);
     requiresExecApprovalMock.mockReset();
     requiresExecApprovalMock.mockReturnValue(true);
     resolveExecHostApprovalContextMock.mockReset();
@@ -357,6 +371,80 @@ describe("executeNodeHostCommand", () => {
         }),
       );
     });
+  });
+
+  it("does not satisfy node allowlist checks with the gateway PATH", async () => {
+    const nodePreparedPlan = {
+      argv: ["tool", "--version"],
+      cwd: "/node/work",
+      commandText: "tool --version",
+      commandPreview: null,
+      agentId: "prepared-agent",
+      sessionKey: "prepared-session",
+    };
+    parsePreparedSystemRunPayloadMock.mockReturnValue({ plan: nodePreparedPlan });
+    resolveExecHostApprovalContextMock.mockReturnValue({
+      approvals: { allowlist: [], file: { version: 1, agents: {} } },
+      hostSecurity: "allowlist",
+      hostAsk: "on-miss",
+      askFallback: "deny",
+    });
+    requiresExecApprovalMock.mockImplementation(
+      (params: { allowlistSatisfied?: boolean; durableApprovalSatisfied?: boolean }) =>
+        params.allowlistSatisfied !== true && params.durableApprovalSatisfied !== true,
+    );
+    evaluateShellAllowlistMock.mockImplementation((params: { env?: NodeJS.ProcessEnv }) => ({
+      allowlistMatches: [],
+      analysisOk: true,
+      allowlistSatisfied: params.env?.PATH === "/trusted/bin:/usr/bin",
+      segments: [{ resolution: null, argv: ["tool", "--version"] }],
+      segmentAllowlistEntries: [],
+    }));
+    resolveApprovalDecisionOrUndefinedMock.mockResolvedValue(undefined);
+    callGatewayToolMock.mockImplementation(
+      async (method: string, _options: unknown, params: MockNodeInvokeParams | undefined) => {
+        if (method === "exec.approvals.node.get") {
+          return { file: { version: 1, agents: {} } };
+        }
+        if (method === "node.invoke" && params?.command === "system.run.prepare") {
+          return { payload: { plan: nodePreparedPlan } };
+        }
+        if (method === "node.invoke" && params?.command === "system.run") {
+          throw new Error("system.run should require approval first");
+        }
+        throw new Error(`unexpected gateway method: ${method}`);
+      },
+    );
+
+    const result = await executeNodeHostCommand({
+      command: "tool --version",
+      workdir: "/gateway/work",
+      env: { PATH: "/trusted/bin:/usr/bin" },
+      requestedEnv: undefined,
+      security: "allowlist",
+      ask: "on-miss",
+      defaultTimeoutSec: 30,
+      approvalRunningNoticeMs: 0,
+      warnings: [],
+      agentId: "requested-agent",
+      sessionKey: "requested-session",
+    });
+
+    expect(result.details?.status).toBe("approval-pending");
+    expect(registerExecApprovalRequestForHostOrThrowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: undefined,
+        workdir: "/node/work",
+        systemRunPlan: nodePreparedPlan,
+      }),
+    );
+    expect(evaluateShellAllowlistMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "tool --version",
+        cwd: "/node/work",
+        env: expect.objectContaining({ PATH: "", Path: "" }),
+      }),
+    );
   });
 
   it("skips approval prepare in full/off mode", async () => {
