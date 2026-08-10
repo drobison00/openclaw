@@ -1272,6 +1272,20 @@ describe("worker runtime", () => {
     );
   });
 
+  it("retains explicit full gateway-host execution", async () => {
+    const { workspaceDir, launch } = await setup({ inferencePlans: ["tool", "text"] });
+    launch.assignment.toolAuthority = {
+      allowedToolNames: ["exec", "process"],
+      exec: { host: "gateway", security: "full", ask: "off" },
+    };
+    const admitted = parseWorkerLaunchDescriptor(structuredClone(launch));
+
+    await expect(runWorkerDescriptor(admitted)).resolves.toMatchObject({ status: "completed" });
+    await expect(readFile(path.join(workspaceDir, "local-proof.txt"), "utf8")).resolves.toBe(
+      "worker-local",
+    );
+  });
+
   it("keeps a pinned replay anchor through repeated local tool-loop inference", async () => {
     const { gateway, launch } = await setup({ inferencePlans: ["tool", "text"] });
     launch.assignment.initialMessages = Array.from(
