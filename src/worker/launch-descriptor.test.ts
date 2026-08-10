@@ -46,6 +46,20 @@ function launchDescriptor(): WorkerLaunchDescriptor {
   };
 }
 
+function expectExecDeniedOrDescriptorRejected(candidate: unknown): void {
+  try {
+    const parsed = parseWorkerLaunchDescriptor(candidate);
+    const authority = parsed.assignment
+      .toolAuthority as WorkerLaunchDescriptor["assignment"]["toolAuthority"] & {
+      exec?: { security?: unknown; ask?: unknown };
+    };
+    expect(authority.exec).toMatchObject({ security: "deny", ask: "off" });
+    expect(authority.exec?.security).not.toBe("full");
+  } catch (error) {
+    expect(error).toMatchObject({ message: "invalid worker launch descriptor" });
+  }
+}
+
 describe("worker launch descriptor", () => {
   it("accepts the exact admitted single-session launch shape", () => {
     const descriptor = launchDescriptor();
@@ -134,6 +148,20 @@ describe("worker launch descriptor", () => {
           toolAuthority: { allowedToolNames: ["read", "gateway"] },
         },
       },
+      {
+        ...descriptor,
+        assignment: {
+          ...descriptor.assignment,
+          toolAuthority: { allowedToolNames: ["exec", "plugin__exec"] },
+        },
+      },
+      {
+        ...descriptor,
+        assignment: {
+          ...descriptor.assignment,
+          toolAuthority: { allowedToolNames: ["exec", "message"] },
+        },
+      },
     ];
 
     for (const candidate of cases) {
@@ -144,6 +172,47 @@ describe("worker launch descriptor", () => {
 
     descriptor.assignment.toolAuthority.allowedToolNames = [];
     expect(parseWorkerLaunchDescriptor(structuredClone(descriptor))).toEqual(descriptor);
+  });
+
+  it("never gives a name-only legacy descriptor permissive exec authority", () => {
+    const descriptor = launchDescriptor();
+
+    expectExecDeniedOrDescriptorRejected(structuredClone(descriptor));
+  });
+
+  it("rejects or denies malformed and partially populated exec authority", () => {
+    const descriptor = launchDescriptor();
+    const cases = [
+      null,
+      {},
+      { security: "deny" },
+      { ask: "off" },
+      { security: "full" },
+      { security: "full", ask: "off" },
+      { security: null, ask: "off" },
+      { security: "deny", ask: false },
+    ];
+
+    for (const exec of cases) {
+      expectExecDeniedOrDescriptorRejected({
+        ...descriptor,
+        assignment: {
+          ...descriptor.assignment,
+          toolAuthority: { ...descriptor.assignment.toolAuthority, exec },
+        },
+      });
+    }
+  });
+
+  it("rejects or denies every accepted legacy launch shape", () => {
+    const descriptor = launchDescriptor();
+    const { toolAuthority: _authority, ...assignmentWithoutAuthority } = descriptor.assignment;
+
+    expectExecDeniedOrDescriptorRejected({ ...descriptor, version: 1 });
+    expectExecDeniedOrDescriptorRejected({
+      ...descriptor,
+      assignment: assignmentWithoutAuthority,
+    });
   });
 
   it("rejects non-absolute paths, unattached sessions, and discontinuous event sequences", () => {

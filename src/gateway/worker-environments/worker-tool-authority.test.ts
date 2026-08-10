@@ -25,10 +25,43 @@ function authority(overrides: Partial<SessionPlacementTurnParams> = {}) {
   }).allowedToolNames;
 }
 
+function resolvedAuthority(overrides: Partial<SessionPlacementTurnParams> = {}) {
+  return resolveWorkerToolAuthority({
+    modelRef: { provider: "openai", model: "gpt-test" },
+    turn: turn(overrides),
+  });
+}
+
 describe("resolveWorkerToolAuthority", () => {
   it("keeps the deterministic complete worker surface when no policy narrows it", () => {
     expect(authority()).toEqual(["read", "write", "edit", "apply_patch", "exec", "process"]);
   });
+
+  it.each([
+    {
+      name: "explicit deny",
+      exec: { security: "deny" as const, ask: "off" as const },
+      expected: { security: "deny", ask: "off" },
+    },
+    {
+      name: "allowlist mode",
+      exec: { mode: "allowlist" as const },
+      expected: { security: "allowlist", ask: "off" },
+    },
+  ])(
+    "carries effective exec authority for $name instead of only the tool name",
+    ({ exec, expected }) => {
+      const resolved = resolvedAuthority({
+        config: { tools: { exec } },
+        toolsAllow: ["exec", "process"],
+      }) as ReturnType<typeof resolveWorkerToolAuthority> & {
+        exec?: { security?: string; ask?: string };
+      };
+
+      expect(resolved.allowedToolNames).toEqual(["exec", "process"]);
+      expect(resolved.exec).toMatchObject(expected);
+    },
+  );
 
   it("projects runtime caps with canonical write-to-apply_patch semantics", () => {
     expect(authority({ toolsAllow: ["write"] })).toEqual(["write", "apply_patch"]);

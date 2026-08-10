@@ -33,6 +33,8 @@ import {
   type WorkerInferenceTerminalOutcome,
 } from "../../packages/gateway-protocol/src/schema/worker-inference.js";
 import { listRunningSessions } from "../agents/bash-process-registry.js";
+import type { SessionPlacementTurnParams } from "../agents/session-placement-admission.js";
+import { resolveWorkerToolAuthority } from "../gateway/worker-environments/worker-tool-authority.js";
 import { buildWorkerConnectParams, type WorkerLaunchDescriptor } from "./launch-descriptor.js";
 import { WORKER_PROVIDER_REPLAY_LOCAL_RETRY_MESSAGE } from "./transcript-message.js";
 import { WorkerAdmissionDeadlineExceededError } from "./worker-connection-contract.js";
@@ -1159,6 +1161,63 @@ describe("worker runtime", () => {
     expect(
       gateway.methods.every((method) => method.startsWith("worker.") || method === "connect"),
     ).toBe(true);
+  });
+
+  it("does not reconstruct denied exec authority as full across the launch boundary", async () => {
+    const { gateway, workspaceDir, launch } = await setup({ inferencePlans: ["tool", "text"] });
+    const restrictedTurn = {
+      sessionId: SESSION_ID,
+      sessionKey: `worker:${SESSION_ID}`,
+      sessionFile: path.join(workspaceDir, "session.jsonl"),
+      workspaceDir,
+      cwd: workspaceDir,
+      prompt: "run",
+      timeoutMs: 1_000,
+      runId: RUN_ID,
+      provider: MODEL_REF.provider,
+      model: MODEL_REF.model,
+      agentId: "main",
+      toolsAllow: ["exec", "process"],
+      config: { tools: { exec: { security: "deny", ask: "off" } } },
+    } as SessionPlacementTurnParams;
+    // Match the JSON-only handoff to the real worker process: the restricted
+    // Gateway config is not ambient state in the worker, only this descriptor is.
+    launch.assignment.toolAuthority = { allowedToolNames: ["exec", "process"] };
+    await expect(runWorkerDescriptor(launch)).resolves.toMatchObject({ status: "completed" });
+
+    await expect(
+      readFile(path.join(workspaceDir, "local-proof.txt"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    expect(gateway.inferenceRequests).toHaveLength(2);
+    expect(
+      gateway.inferenceRequests[1]?.context.messages.some(
+        (message) => message.role === "toolResult",
+      ),
+    ).toBe(true);
+    expect(
+      resolveWorkerToolAuthority({ modelRef: MODEL_REF, turn: restrictedTurn }).allowedToolNames,
+    ).toEqual(launch.assignment.toolAuthority.allowedToolNames);
+  });
+
+  it("keeps explicit deny through owner hooks, construction defaults, and plugin filtering", async () => {
+    const { gateway, workspaceDir, launch } = await setup({
+      inferencePlans: ["tool", "text"],
+    });
+    launch.assignment.toolAuthority = {
+      allowedToolNames: ["exec", "process"],
+      exec: { security: "deny", ask: "off" },
+    } as WorkerLaunchDescriptor["assignment"]["toolAuthority"];
+
+    await expect(runWorkerDescriptor(launch)).resolves.toMatchObject({ status: "completed" });
+
+    await expect(
+      readFile(path.join(workspaceDir, "local-proof.txt"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    expect(gateway.inferenceRequests[0]?.context.tools?.map((tool) => tool.name)).toEqual([
+      "exec",
+      "process",
+    ]);
+    expect(gateway.inferenceRequests).toHaveLength(2);
   });
 
   it("keeps a pinned replay anchor through repeated local tool-loop inference", async () => {
