@@ -150,6 +150,8 @@ export async function runWorkerEmbeddedTurn(params: RunWorkerEmbeddedTurnParams)
     applyPatchWorkspaceOnly: true,
     execDefaults: {
       ...execAuthority,
+      // The worker is already isolated; a nested sandbox runtime does not exist here.
+      host: execAuthority.host === "sandbox" ? "gateway" : execAuthority.host,
       config: WORKER_TOOL_CONFIG,
       commandHighlighting: false,
       agentId: DEFAULT_AGENT_ID,

@@ -41,23 +41,30 @@ function launchDescriptor(): WorkerLaunchDescriptor {
       ],
       transcript: { baseLeafId: "leaf-7", nextSeq: 8 },
       liveEvents: { ackedSeq: 12, nextSeq: 13 },
-      toolAuthority: { allowedToolNames: ["read", "exec"] },
+      toolAuthority: {
+        allowedToolNames: ["read", "exec"],
+        exec: { host: "gateway", security: "full", ask: "off" },
+      },
     },
   };
 }
 
 function expectExecDeniedOrDescriptorRejected(candidate: unknown): void {
+  let parsed: WorkerLaunchDescriptor;
   try {
-    const parsed = parseWorkerLaunchDescriptor(candidate);
-    const authority = parsed.assignment
-      .toolAuthority as WorkerLaunchDescriptor["assignment"]["toolAuthority"] & {
-      exec?: { security?: unknown; ask?: unknown };
-    };
-    expect(authority.exec).toMatchObject({ security: "deny", ask: "off" });
-    expect(authority.exec?.security).not.toBe("full");
+    parsed = parseWorkerLaunchDescriptor(candidate);
   } catch (error) {
     expect(error).toMatchObject({ message: "invalid worker launch descriptor" });
+    return;
   }
+  const authority = parsed.assignment
+    .toolAuthority as WorkerLaunchDescriptor["assignment"]["toolAuthority"] & {
+    exec?: { security?: unknown; ask?: unknown };
+  };
+  if (authority.exec !== undefined) {
+    expect(authority.exec).toMatchObject({ security: "deny", ask: "off" });
+  }
+  expect(authority.exec?.security).not.toBe("full");
 }
 
 describe("worker launch descriptor", () => {
@@ -176,8 +183,12 @@ describe("worker launch descriptor", () => {
 
   it("never gives a name-only legacy descriptor permissive exec authority", () => {
     const descriptor = launchDescriptor();
+    const { exec: _exec, ...nameOnlyAuthority } = descriptor.assignment.toolAuthority;
 
-    expectExecDeniedOrDescriptorRejected(structuredClone(descriptor));
+    expectExecDeniedOrDescriptorRejected({
+      ...descriptor,
+      assignment: { ...descriptor.assignment, toolAuthority: nameOnlyAuthority },
+    });
   });
 
   it("rejects or denies malformed and partially populated exec authority", () => {

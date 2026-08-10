@@ -1128,6 +1128,12 @@ describe("worker runtime", () => {
 
   it("executes coding tools locally without reading the preexisting auth profile", async () => {
     const { gateway, workspaceDir, launch } = await setup({ inferencePlans: ["tool", "text"] });
+    // This is a legitimate-exec fixture; missing authority is intentionally fail-closed.
+    launch.assignment.toolAuthority.exec = {
+      host: "gateway",
+      security: "full",
+      ask: "off",
+    };
     const previousStateDir = process.env.OPENCLAW_STATE_DIR;
     const previousConfigPath = process.env.OPENCLAW_CONFIG_PATH;
     const trapStateDir = path.join(workspaceDir, "state-trap");
@@ -1266,6 +1272,11 @@ describe("worker runtime", () => {
     };
     const admitted = parseWorkerLaunchDescriptor(structuredClone(launch));
 
+    expect(admitted.assignment.toolAuthority.exec).toEqual({
+      host: "sandbox",
+      security: "full",
+      ask: "off",
+    });
     await expect(runWorkerDescriptor(admitted)).resolves.toMatchObject({ status: "completed" });
     await expect(readFile(path.join(workspaceDir, "local-proof.txt"), "utf8")).resolves.toBe(
       "worker-local",
