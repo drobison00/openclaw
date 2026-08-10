@@ -17,4 +17,9 @@ export function isWorkerLocalToolName(value: unknown): value is WorkerLocalToolN
 
 export type WorkerToolAuthority = {
   allowedToolNames: WorkerLocalToolName[];
+  exec?: {
+    host: "sandbox" | "gateway" | "node";
+    security: "deny" | "allowlist" | "full";
+    ask: "off" | "on-miss" | "always";
+  };
 };

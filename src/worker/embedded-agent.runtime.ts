@@ -32,7 +32,11 @@ import {
   toAgentMessage,
   toWorkerInferenceContext,
 } from "./embedded-agent-transcript.runtime.js";
-import { WORKER_LOCAL_TOOL_NAMES, type WorkerLocalToolName } from "./tool-authority.js";
+import {
+  WORKER_LOCAL_TOOL_NAMES,
+  type WorkerLocalToolName,
+  type WorkerToolAuthority,
+} from "./tool-authority.js";
 import { WORKER_PROVIDER_REPLAY_LOCAL_RETRY_MESSAGE } from "./transcript-message.js";
 
 function toError(value: unknown, fallback: string): Error {
@@ -76,6 +80,7 @@ type RunWorkerEmbeddedTurnParams = {
   systemPrompt?: string;
   inferenceOptions?: WorkerInferenceOptions;
   allowedToolNames: readonly WorkerLocalToolName[];
+  execAuthority: WorkerToolAuthority["exec"];
   signal?: AbortSignal;
 };
 
@@ -124,6 +129,13 @@ export async function runWorkerEmbeddedTurn(params: RunWorkerEmbeddedTurnParams)
   const allowedToolNameSet = new Set<string>(params.allowedToolNames);
   const activeToolNames = WORKER_LOCAL_TOOL_NAMES.filter((name) => allowedToolNameSet.has(name));
   const localToolNameSet = new Set<string>(WORKER_LOCAL_TOOL_NAMES);
+  // The Gateway resolves effective exec policy before dispatch; deriving it from the worker's
+  // isolated config would reconstruct restricted turns with wider authority.
+  const execAuthority = params.execAuthority ?? {
+    host: "gateway",
+    security: "deny",
+    ask: "off",
+  };
   const coreTools = createCoreCodingTools({
     codingRoot: params.cwd,
     includeBaseCodingTools: true,
@@ -137,9 +149,7 @@ export async function runWorkerEmbeddedTurn(params: RunWorkerEmbeddedTurnParams)
     }),
     applyPatchWorkspaceOnly: true,
     execDefaults: {
-      host: "gateway",
-      security: "full",
-      ask: "off",
+      ...execAuthority,
       config: WORKER_TOOL_CONFIG,
       commandHighlighting: false,
       agentId: DEFAULT_AGENT_ID,
