@@ -63,6 +63,21 @@ describe("resolveWorkerToolAuthority", () => {
     },
   );
 
+  it.each(["sandbox", "node"] as const)(
+    "emits reachable %s-host authority that the worker consumer must honor",
+    (host) => {
+      expect(
+        resolvedAuthority({
+          config: { tools: { exec: { host, mode: "full" } } },
+          toolsAllow: ["exec", "process"],
+        }),
+      ).toMatchObject({
+        allowedToolNames: ["exec", "process"],
+        exec: { host, security: "full", ask: "off" },
+      });
+    },
+  );
+
   it("projects runtime caps with canonical write-to-apply_patch semantics", () => {
     expect(authority({ toolsAllow: ["write"] })).toEqual(["write", "apply_patch"]);
     expect(authority({ toolsAllow: [] })).toEqual([]);

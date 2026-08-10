@@ -35,7 +35,11 @@ import {
 import { listRunningSessions } from "../agents/bash-process-registry.js";
 import type { SessionPlacementTurnParams } from "../agents/session-placement-admission.js";
 import { resolveWorkerToolAuthority } from "../gateway/worker-environments/worker-tool-authority.js";
-import { buildWorkerConnectParams, type WorkerLaunchDescriptor } from "./launch-descriptor.js";
+import {
+  buildWorkerConnectParams,
+  parseWorkerLaunchDescriptor,
+  type WorkerLaunchDescriptor,
+} from "./launch-descriptor.js";
 import { WORKER_PROVIDER_REPLAY_LOCAL_RETRY_MESSAGE } from "./transcript-message.js";
 import { WorkerAdmissionDeadlineExceededError } from "./worker-connection-contract.js";
 import { createWorkerConnection, WorkerConnectionStoppedError } from "./worker-connection.js";
@@ -1218,6 +1222,54 @@ describe("worker runtime", () => {
       "process",
     ]);
     expect(gateway.inferenceRequests).toHaveLength(2);
+  });
+
+  it("preserves resolved deny through serialized descriptor admission and worker execution", async () => {
+    const { gateway, workspaceDir, launch } = await setup({ inferencePlans: ["tool", "text"] });
+    const restrictedTurn = {
+      sessionId: SESSION_ID,
+      sessionKey: `worker:${SESSION_ID}`,
+      sessionFile: path.join(workspaceDir, "session.jsonl"),
+      workspaceDir,
+      cwd: workspaceDir,
+      prompt: "run",
+      timeoutMs: 1_000,
+      runId: RUN_ID,
+      provider: MODEL_REF.provider,
+      model: MODEL_REF.model,
+      agentId: "main",
+      toolsAllow: ["exec", "process"],
+      config: { tools: { exec: { security: "deny", ask: "off" } } },
+    } as SessionPlacementTurnParams;
+    launch.assignment.toolAuthority = resolveWorkerToolAuthority({
+      modelRef: MODEL_REF,
+      turn: restrictedTurn,
+    });
+    const admitted = parseWorkerLaunchDescriptor(structuredClone(launch));
+
+    expect(admitted.assignment.toolAuthority).toMatchObject({
+      allowedToolNames: ["exec", "process"],
+      exec: { host: "gateway", security: "deny", ask: "off" },
+    });
+    await expect(runWorkerDescriptor(admitted)).resolves.toMatchObject({ status: "completed" });
+    await expect(
+      readFile(path.join(workspaceDir, "local-proof.txt"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    expect(gateway.inferenceRequests).toHaveLength(2);
+  });
+
+  it("honors reachable full sandbox-host authority in the isolated worker", async () => {
+    const { workspaceDir, launch } = await setup({ inferencePlans: ["tool", "text"] });
+    launch.assignment.toolAuthority = {
+      allowedToolNames: ["exec", "process"],
+      exec: { host: "sandbox", security: "full", ask: "off" },
+    };
+    const admitted = parseWorkerLaunchDescriptor(structuredClone(launch));
+
+    await expect(runWorkerDescriptor(admitted)).resolves.toMatchObject({ status: "completed" });
+    await expect(readFile(path.join(workspaceDir, "local-proof.txt"), "utf8")).resolves.toBe(
+      "worker-local",
+    );
   });
 
   it("keeps a pinned replay anchor through repeated local tool-loop inference", async () => {
