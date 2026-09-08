@@ -11,6 +11,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import type { MattermostConfig } from "../types.js";
 import type { ResolvedMattermostAccount } from "./accounts.js";
 import {
@@ -35,6 +36,7 @@ const MULTI_ACCOUNT_BODY_MAX_BYTES = 64 * 1024;
 const MULTI_ACCOUNT_BODY_TIMEOUT_MS = 5_000;
 const slashRouteInFlightLimiter = createWebhookInFlightLimiter();
 const SLASH_ROUTE_IN_FLIGHT_KEY = "mattermost:slash";
+const SLASH_AUTHENTICATED_IN_FLIGHT_KEY = `${SLASH_ROUTE_IN_FLIGHT_KEY}:authenticated`;
 type SlashHandler = ReturnType<typeof createSlashCommandHttpHandler>;
 type SlashHandlerMatchSource = "token" | "command";
 type SlashHandlerMatch =
@@ -89,6 +91,30 @@ function getSlashAccountStates(): Map<string, SlashCommandAccountState> {
 }
 
 const accountStates = getSlashAccountStates();
+
+function resolveSlashRouteInFlightKey(authorization: string | undefined): string {
+  const token = authorization?.match(/^Token ([^,\s]+)$/iu)?.[1];
+  if (!token) {
+    return SLASH_ROUTE_IN_FLIGHT_KEY;
+  }
+
+  const matchingAccountIds: string[] = [];
+  for (const [accountId, state] of accountStates) {
+    let matched = false;
+    for (const commandToken of state.commandTokens) {
+      matched = safeEqualSecret(token, commandToken) || matched;
+    }
+    if (matched) {
+      matchingAccountIds.push(accountId);
+    }
+  }
+
+  return matchingAccountIds.length === 1
+    ? `${SLASH_AUTHENTICATED_IN_FLIGHT_KEY}:${matchingAccountIds[0]}`
+    : matchingAccountIds.length > 1
+      ? SLASH_AUTHENTICATED_IN_FLIGHT_KEY
+      : SLASH_ROUTE_IN_FLIGHT_KEY;
+}
 
 function resolveSlashHandlerForToken(token: string): SlashHandlerMatch {
   const matches: Array<{
@@ -417,9 +443,10 @@ export function registerSlashCommandRoute(api: OpenClawPluginApi) {
   };
 
   const routeHandler = async (req: IncomingMessage, res: ServerResponse) => {
-    // Mattermost commonly fans all users through shared provider addresses, so one
-    // route-global key bounds ingress without partitioning capacity by source IP.
-    if (!slashRouteInFlightLimiter.tryAcquire(SLASH_ROUTE_IN_FLIGHT_KEY)) {
+    // Header matching only selects a capacity pool. The handler still authenticates
+    // the body token and current command before releasing this admission guard.
+    const inFlightKey = resolveSlashRouteInFlightKey(req.headers.authorization);
+    if (!slashRouteInFlightLimiter.tryAcquire(inFlightKey)) {
       await sendHttpRequestRejection(req, res, 429, "Too Many Requests");
       return;
     }
@@ -430,7 +457,7 @@ export function registerSlashCommandRoute(api: OpenClawPluginApi) {
         return;
       }
       released = true;
-      slashRouteInFlightLimiter.release(SLASH_ROUTE_IN_FLIGHT_KEY);
+      slashRouteInFlightLimiter.release(inFlightKey);
     };
     try {
       await dispatchRoute(req, res, release);

@@ -52,7 +52,11 @@ function createRuntime(dispatch: ReturnType<typeof vi.fn>) {
   };
 }
 
-function openHeldRequest(params: { port: number; localAddress: string }): HeldRequest {
+function openHeldRequest(params: {
+  port: number;
+  localAddress: string;
+  authorization?: string;
+}): HeldRequest {
   const held: HeldRequest = {
     socket: connect({
       host: "127.0.0.1",
@@ -71,6 +75,7 @@ function openHeldRequest(params: { port: number; localAddress: string }): HeldRe
         `Host: 127.0.0.1:${params.port}`,
         "Content-Type: application/x-www-form-urlencoded",
         "Content-Length: 1",
+        ...(params.authorization ? [`Authorization: ${params.authorization}`] : []),
         "Connection: close",
         "",
         "",
@@ -98,6 +103,7 @@ async function postForm(params: {
   port: number;
   body: string;
   localAddress: string;
+  authorization?: string;
 }): Promise<{ statusCode: number; body: string }> {
   return await new Promise((resolve, reject) => {
     const req = request(
@@ -111,6 +117,7 @@ async function postForm(params: {
           "content-type": "application/x-www-form-urlencoded",
           "content-length": Buffer.byteLength(params.body),
           connection: "close",
+          ...(params.authorization ? { authorization: params.authorization } : {}),
         },
       },
       (res) => {
@@ -134,7 +141,7 @@ describe("Mattermost slash HTTP boundary", () => {
     deactivateSlashCommands();
   });
 
-  it("bounds pre-auth bodies at the registered route, closes overflow, and recovers", async () => {
+  it("reserves authenticated capacity and bounds each pre-authentication pool at eight", async () => {
     const routes = new Map<string, SlashRouteHandler>();
     const registrations: Array<{ path: string; auth: string | undefined }> = [];
     const dispatch = vi.fn(async (_params: unknown) => undefined);
@@ -256,48 +263,6 @@ describe("Mattermost slash HTTP boundary", () => {
         api: { cfg: {}, runtime: { log() {}, error() {}, exit() {} } },
       });
 
-      const held = Array.from({ length: 12 }, (_, index) =>
-        openHeldRequest({
-          port: address.port,
-          localAddress: `127.0.0.${index + 2}`,
-        }),
-      );
-
-      await vi.waitFor(
-        () => {
-          expect(held.filter((entry) => entry.statusCode === 429)).toHaveLength(4);
-        },
-        { timeout: 3_000 },
-      );
-      const overflow = held.filter((entry) => entry.statusCode === 429);
-      const admitted = held.filter((entry) => entry.statusCode === undefined);
-      expect(admitted).toHaveLength(8);
-      expect(callbackSourceAddresses).toHaveLength(12);
-      expect(new Set(callbackSourceAddresses).size).toBe(12);
-      await vi.waitFor(
-        () => {
-          expect(overflow.every((entry) => entry.endedByServer && entry.closedByServer)).toBe(true);
-        },
-        { timeout: 3_000 },
-      );
-
-      for (const entry of admitted) {
-        entry.socket.write("x");
-      }
-      await vi.waitFor(
-        () => {
-          expect(admitted.every((entry) => entry.statusCode === 400)).toBe(true);
-        },
-        { timeout: 3_000 },
-      );
-
-      const recovered = await postForm({
-        port: address.port,
-        body: "x",
-        localAddress: "127.0.0.20",
-      });
-      expect(recovered.statusCode).toBe(400);
-
       const validBody = new URLSearchParams({
         token: TOKEN,
         team_id: "team-1",
@@ -308,16 +273,111 @@ describe("Mattermost slash HTTP boundary", () => {
         text: "hello",
         trigger_id: "trigger-1",
       }).toString();
+
+      const sharedHeld = Array.from({ length: 8 }, (_, index) =>
+        openHeldRequest({
+          port: address.port,
+          localAddress: `127.0.0.${index + 2}`,
+        }),
+      );
+      await vi.waitFor(
+        () => {
+          expect(callbackSourceAddresses).toHaveLength(8);
+        },
+        { timeout: 3_000 },
+      );
+      expect(sharedHeld.every((entry) => entry.statusCode === undefined)).toBe(true);
+
+      const sharedOverflow = openHeldRequest({
+        port: address.port,
+        localAddress: "127.0.0.10",
+      });
+      await vi.waitFor(() => expect(sharedOverflow.statusCode).toBe(429), { timeout: 3_000 });
+      await vi.waitFor(
+        () => {
+          expect(sharedOverflow.endedByServer && sharedOverflow.closedByServer).toBe(true);
+        },
+        { timeout: 3_000 },
+      );
+
       const valid = await postForm({
         port: address.port,
         body: validBody,
-        localAddress: "127.0.0.21",
+        localAddress: "127.0.0.11",
+        authorization: `Token ${TOKEN}`,
       });
       expect(valid).toEqual({
         statusCode: 200,
         body: JSON.stringify({ response_type: "ephemeral", text: "Processing..." }),
       });
       await vi.waitFor(() => expect(dispatch).toHaveBeenCalledOnce());
+
+      for (const entry of sharedHeld) {
+        entry.socket.write("x");
+      }
+      await vi.waitFor(
+        () => {
+          expect(sharedHeld.every((entry) => entry.statusCode === 400)).toBe(true);
+        },
+        { timeout: 3_000 },
+      );
+
+      const sharedVariants = Array.from({ length: 8 }, (_, index) =>
+        openHeldRequest({
+          port: address.port,
+          localAddress: `127.0.0.${index + 12}`,
+          authorization:
+            index === 6 ? "Token wrong-token" : index === 7 ? `Bearer ${TOKEN}` : undefined,
+        }),
+      );
+      await vi.waitFor(() => expect(callbackSourceAddresses).toHaveLength(18), { timeout: 3_000 });
+      expect(sharedVariants.every((entry) => entry.statusCode === undefined)).toBe(true);
+      const variantOverflow = openHeldRequest({
+        port: address.port,
+        localAddress: "127.0.0.20",
+      });
+      await vi.waitFor(() => expect(variantOverflow.statusCode).toBe(429), { timeout: 3_000 });
+      for (const entry of sharedVariants) {
+        entry.socket.write("x");
+      }
+      await vi.waitFor(
+        () => expect(sharedVariants.every((entry) => entry.statusCode === 400)).toBe(true),
+        { timeout: 3_000 },
+      );
+
+      const authenticatedHeld = Array.from({ length: 8 }, (_, index) =>
+        openHeldRequest({
+          port: address.port,
+          localAddress: `127.0.0.${index + 21}`,
+          authorization: `Token ${TOKEN}`,
+        }),
+      );
+      await vi.waitFor(() => expect(callbackSourceAddresses).toHaveLength(27), { timeout: 3_000 });
+      expect(authenticatedHeld.every((entry) => entry.statusCode === undefined)).toBe(true);
+      const authenticatedOverflow = openHeldRequest({
+        port: address.port,
+        localAddress: "127.0.0.29",
+        authorization: `Token ${TOKEN}`,
+      });
+      await vi.waitFor(() => expect(authenticatedOverflow.statusCode).toBe(429), {
+        timeout: 3_000,
+      });
+
+      const recovered = await postForm({
+        port: address.port,
+        body: "x",
+        localAddress: "127.0.0.30",
+      });
+      expect(recovered.statusCode).toBe(400);
+      for (const entry of authenticatedHeld) {
+        entry.socket.write("x");
+      }
+      await vi.waitFor(
+        () => expect(authenticatedHeld.every((entry) => entry.statusCode === 400)).toBe(true),
+        { timeout: 3_000 },
+      );
+
+      expect(new Set(callbackSourceAddresses).size).toBe(callbackSourceAddresses.length);
       expect(dispatch.mock.calls[0]?.[0]).toMatchObject({
         channel: "mattermost",
         accountId: "default",
@@ -336,5 +396,5 @@ describe("Mattermost slash HTTP boundary", () => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
     }
-  }, 15_000);
+  }, 20_000);
 });
