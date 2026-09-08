@@ -193,10 +193,13 @@ async function runWorkerEmbeddedTurnWithResources(
     onMessagePersisted: transcriptRuntime.onMessagePersisted,
   });
 
-  // Exec security/ask are host-relative; substituting a host reinterprets the authority.
-  // Deny unavailable worker exec here or sandbox grants become Gateway over-grants.
+  // Exec security/ask are host-relative, and workers have no Gateway transport for node RPC:
+  // snapshotNodeWorkerEnv strips the Gateway URL/token, so resolveNodeExecutionTarget ->
+  // callGatewayTool has no loopback. Fail closed; the descriptor still carries audit authority.
   const execUnavailable =
-    params.execAuthority === undefined || params.execAuthority.host === "sandbox";
+    params.execAuthority === undefined ||
+    params.execAuthority.host === "sandbox" ||
+    params.execAuthority.host === "node";
   const allowedToolNameSet = new Set<string>(params.allowedToolNames);
   if (execUnavailable) {
     allowedToolNameSet.delete("exec");
