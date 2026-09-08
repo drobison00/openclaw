@@ -43,9 +43,9 @@ function isCiLikeEnv(env: Env = process.env) {
 
 // Small CI runners share one constraint check for shard concurrency and Go memory policy.
 export function isConstrainedCiCheckHost(hostResources: Resources) {
-  return (
-    hostResources.totalMemoryBytes < CI_PARALLEL_MIN_MEMORY_BYTES ||
-    hostResources.logicalCpuCount < CI_PARALLEL_MIN_CPUS
+  return !(
+    hostResources.totalMemoryBytes >= CI_PARALLEL_MIN_MEMORY_BYTES &&
+    hostResources.logicalCpuCount >= CI_PARALLEL_MIN_CPUS
   );
 }
 
@@ -86,37 +86,7 @@ export function resolveRepoToolBinPath(
   return fileExists(primaryPath) ? primaryPath : localPath;
 }
 
-/** Link a dependency-less worktree to the primary checkout toolchain selected above. */
-export function ensureRepoToolNodeModulesLink(
-  toolPath: string,
-  {
-    cwd = process.cwd(),
-    fileExists = fs.existsSync,
-    resolveCommonDir = resolveGitCommonDir,
-    symlink = fs.symlinkSync,
-    platform = process.platform,
-  }: RepoToolOptions & NodeModulesLinkOptions = {},
-) {
-  const localNodeModules = path.resolve(cwd, "node_modules");
-  if (fileExists(localNodeModules)) {
-    return localNodeModules;
-  }
-
-  const commonDir = resolveCommonDir(cwd);
-  if (!commonDir || path.basename(commonDir) !== ".git") {
-    return null;
-  }
-
-  const primaryNodeModules = path.join(path.dirname(commonDir), "node_modules");
-  const toolNodeModules = path.dirname(path.dirname(path.resolve(toolPath)));
-  if (toolNodeModules !== path.resolve(primaryNodeModules) || !fileExists(primaryNodeModules)) {
-    return null;
-  }
-
-  return ensureRepoNodeModulesLink(primaryNodeModules, { cwd, fileExists, symlink, platform });
-}
-
-/** Make selected toolchain packages resolvable from dependency-less source paths. */
+/** Link explicitly provisioned dependencies for hydration or relocated declarations. */
 export function ensureRepoNodeModulesLink(
   modulesDir: string,
   {

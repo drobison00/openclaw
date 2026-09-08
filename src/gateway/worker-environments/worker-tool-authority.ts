@@ -85,7 +85,6 @@ export function resolveWorkerToolAuthority(params: {
   modelRef: { provider: string; model: string };
   turn: SessionPlacementTurnParams;
   availableOptionalToolNames?: readonly WorkerOptionalLocalToolName[];
-  githubPublicationAvailable?: boolean;
   portalAvailable?: boolean;
 }): WorkerToolAuthority {
   const turn = params.turn;
@@ -120,9 +119,7 @@ export function resolveWorkerToolAuthority(params: {
       ...WORKER_SESSION_TOOL_NAMES.filter((name) =>
         name === "skill_workshop"
           ? turn.skillLibraryAuthoring !== undefined
-          : name === "github_publish"
-            ? params.githubPublicationAvailable === true
-            : name !== "portal" || params.portalAvailable === true,
+          : name !== "portal" || params.portalAvailable === true,
       ),
     ].map((name) => ({ name })),
     turn.toolsAllow,

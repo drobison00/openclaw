@@ -204,10 +204,6 @@ async function getConfigSnapshot(
       ...(measure ? { measure } : {}),
     });
   }
-  // Tests often mutate config fixtures; caching can make those flaky.
-  if (process.env.VITEST === "true") {
-    return readConfigFileSnapshot(measure ? { measure } : undefined);
-  }
   if (!configSnapshotPromise) {
     const pendingSnapshot = readConfigFileSnapshot(measure ? { measure } : undefined);
     configSnapshotPromise = pendingSnapshot;
@@ -263,7 +259,21 @@ export async function ensureConfigReady(
         ...(params.measure ? { measure: params.measure } : {}),
         ...(commandName === "status" ? { observe: false } : {}),
         ...(shouldRequireStartupMigrationCheckpoint(commandPath)
-          ? { requireStartupMigrationCheckpoint: true }
+          ? {
+              requireStartupMigrationCheckpoint: true,
+              validateStartupConfig: async (snapshot) => {
+                const { getGatewayStartGuardErrors } =
+                  await import("../gateway-cli/pre-bootstrap.js");
+                const errors = getGatewayStartGuardErrors({
+                  allowUnconfigured: params.allowInvalid,
+                  configExists: snapshot.exists,
+                  mode: snapshot.config.gateway?.mode,
+                });
+                if (errors.length > 0) {
+                  throw new Error(errors.join("\n"));
+                }
+              },
+            }
           : { requireStateMigrationCheckpoint: true }),
         ...(params.beforeStateMigrations
           ? { beforeStateMigrations: params.beforeStateMigrations }
@@ -280,6 +290,11 @@ export async function ensureConfigReady(
         ? await runDoctorConfigPreflight()
         : await withSuppressedNotes(runDoctorConfigPreflight);
     } catch (error) {
+      if (shouldRequireStartupMigrationCheckpoint(commandPath)) {
+        await (
+          await import("../gateway-cli/startup-maintenance.js")
+        ).handleGatewayStartupMaintenance(error);
+      }
       if (error instanceof ExitError) {
         // The migration owner has unwound its lease and heartbeat before this handoff.
         params.runtime.exit(error.code);
