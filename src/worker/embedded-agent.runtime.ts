@@ -18,7 +18,10 @@ import { createCoreCodingTools } from "../agents/core-coding-tools.js";
 import { createEmbeddedAgentResourceLoader } from "../agents/embedded-agent-runner/resource-loader.js";
 import { createNativeModelOwnedRuntimeModel } from "../agents/embedded-agent-runner/run/setup.js";
 import type { PreparedGitHubToolEnvironment } from "../agents/github-tool-identity.js";
-import { resolveSessionPermissionCoreToolPolicy } from "../agents/session-permission-exec-mode.js";
+import {
+  projectEffectiveExecPolicy,
+  resolveSessionPermissionCoreToolPolicy,
+} from "../agents/session-permission-exec-mode.js";
 import { guardSessionManager } from "../agents/session-tool-result-guard-wrapper.js";
 import { AuthStorage } from "../agents/sessions/auth-storage.js";
 import { ModelRegistry } from "../agents/sessions/model-registry.js";
@@ -29,7 +32,6 @@ import { resolveToolLoopDetectionConfig } from "../agents/tool-loop-detection-co
 import { wrapToolWithGatewayCallerIdentity } from "../agents/tools/gateway-caller-context.js";
 import { DEFAULT_AGENTS_FILENAME, loadWorkspaceBootstrapFiles } from "../agents/workspace.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import { maxAsk, minSecurity, resolveExecPolicyForMode } from "../infra/exec-approvals.js";
 import type { AssistantMessage, AssistantMessageEventStreamLike } from "../llm/types.js";
 import { materializeSkillResources } from "../skills/runtime/resources.js";
 import { createWorkerBrowserToolRuntime, type WorkerBrowserRuntime } from "./browser-runtime.js";
@@ -225,20 +227,15 @@ async function runWorkerEmbeddedTurnWithResources(
     security: "deny" as const,
     ask: "off" as const,
   };
-  const permissionExecPolicy = permissionToolPolicy
-    ? resolveExecPolicyForMode(permissionToolPolicy.execMode)
-    : undefined;
-  const execSecurity = minSecurity(
-    execAuthority.security,
-    permissionExecPolicy?.security ?? "full",
-  );
-  const execAsk = maxAsk(execAuthority.ask, permissionExecPolicy?.ask ?? "off");
-  const execMode =
-    permissionToolPolicy &&
-    execSecurity === permissionExecPolicy?.security &&
-    execAsk === permissionExecPolicy.ask
-      ? permissionToolPolicy.execMode
-      : undefined;
+  const {
+    security: execSecurity,
+    ask: execAsk,
+    mode: execMode,
+  } = projectEffectiveExecPolicy({
+    base: execAuthority,
+    overrides: execAuthority,
+    permissionPolicy: params.permissionMode ? { mode: params.permissionMode } : undefined,
+  });
   const coreTools = createCoreCodingTools({
     skillsSnapshot,
     codingRoot: params.cwd,
@@ -257,14 +254,16 @@ async function runWorkerEmbeddedTurnWithResources(
       }),
     applyPatchWorkspaceOnly: permissionToolPolicy?.applyPatchWorkspaceOnly ?? true,
     execDefaults: {
-      bypassHostApprovalFloors: permissionToolPolicy?.bypassHostApprovalFloors,
+      bypassHostApprovalFloors:
+        permissionToolPolicy?.bypassHostApprovalFloors && execSecurity === "full",
+      safeBins: execAuthority.safeBins ?? [],
       host: execAuthority.host,
       node: execAuthority.host === "node" ? execAuthority.node : undefined,
       nodeCwd: execAuthority.host === "node" ? execAuthority.nodeCwd : undefined,
       security: execSecurity,
       ask: execAsk,
       ...(execMode ? { mode: execMode } : {}),
-      // Safe clamp v1 keeps allowlist hits local but denies misses before review.
+      // Host-specific approvals are not portable; misses require local execution.
       // Worker LLM review and interactive approval RPC remain a named follow-up.
       nonInteractiveApproval: Boolean(
         permissionToolPolicy && permissionToolPolicy.execMode !== "full",

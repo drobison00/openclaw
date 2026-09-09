@@ -169,13 +169,14 @@ function parseToolAuthority(value: unknown): WorkerToolAuthority | undefined {
   if (!isRecord(exec)) {
     return undefined;
   }
-  const { host, security, ask, node, nodeCwd } = exec;
+  const { host, security, ask, node, nodeCwd, safeBins } = exec;
   if (
     !hasExactOwnKeys(
       exec,
       ["host", "security", "ask"],
-      host === "node" ? ["node", "nodeCwd"] : [],
+      host === "node" ? ["node", "nodeCwd", "safeBins"] : ["safeBins"],
     ) ||
+    (Object.hasOwn(exec, "safeBins") && (!Array.isArray(safeBins) || safeBins.length !== 0)) ||
     (host !== "sandbox" && host !== "gateway" && host !== "node") ||
     (security !== "deny" && security !== "allowlist" && security !== "full") ||
     (ask !== "off" && ask !== "on-miss" && ask !== "always") ||
@@ -198,7 +199,7 @@ function parseToolAuthority(value: unknown): WorkerToolAuthority | undefined {
       : { host, security, ask };
   return {
     allowedToolNames,
-    exec: execAuthority,
+    exec: { ...execAuthority, ...(safeBins !== undefined ? { safeBins: [] } : {}) },
   };
 }
 

@@ -457,6 +457,12 @@ describe("worker launch descriptor", () => {
       { security: null, ask: "off" },
       { security: "deny", ask: false },
       { host: "gateway", security: "full", ask: "off", unexpected: true },
+      ...[null, false, {}, ["head"], ["/usr/bin/head"]].map((safeBins) => ({
+        host: "gateway",
+        security: "allowlist",
+        ask: "off",
+        safeBins,
+      })),
       { host: "gateway", security: "full", ask: "off", node: "worker-node" },
       { host: "gateway", security: "full", ask: "off", nodeCwd: "/remote/workspace" },
       { host: "elsewhere", security: "full", ask: "off" },

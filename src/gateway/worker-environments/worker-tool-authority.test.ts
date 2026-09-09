@@ -169,7 +169,7 @@ describe("resolveWorkerToolAuthority", () => {
         execSession,
         toolsAllow: ["exec", "process"],
       }).exec,
-    ).toEqual(expected);
+    ).toEqual({ ...expected, safeBins: [] });
   });
 
   it.each([
