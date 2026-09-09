@@ -10,6 +10,7 @@
  * overwrite each other's tokens, registered commands, or handlers.
  */
 
+import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { safeEqualSecret } from "openclaw/plugin-sdk/security-runtime";
 import type { MattermostConfig } from "../types.js";
@@ -98,22 +99,20 @@ function resolveSlashRouteInFlightKey(authorization: string | undefined): string
     return SLASH_ROUTE_IN_FLIGHT_KEY;
   }
 
-  const matchingAccountIds: string[] = [];
-  for (const [accountId, state] of accountStates) {
-    let matched = false;
+  let matched = false;
+  for (const state of accountStates.values()) {
     for (const commandToken of state.commandTokens) {
       matched = safeEqualSecret(token, commandToken) || matched;
     }
-    if (matched) {
-      matchingAccountIds.push(accountId);
-    }
   }
 
-  return matchingAccountIds.length === 1
-    ? `${SLASH_AUTHENTICATED_IN_FLIGHT_KEY}:${matchingAccountIds[0]}`
-    : matchingAccountIds.length > 1
-      ? SLASH_AUTHENTICATED_IN_FLIGHT_KEY
-      : SLASH_ROUTE_IN_FLIGHT_KEY;
+  // Only known credentials create keys, never arbitrary headers or raw secrets.
+  // Distinct credentials stay isolated even when one startup token is later revoked.
+  return matched
+    ? `${SLASH_AUTHENTICATED_IN_FLIGHT_KEY}:${createHash("sha256")
+        .update(`${SLASH_AUTHENTICATED_IN_FLIGHT_KEY}:${token}`)
+        .digest("hex")}`
+    : SLASH_ROUTE_IN_FLIGHT_KEY;
 }
 
 function resolveSlashHandlerForToken(token: string): SlashHandlerMatch {

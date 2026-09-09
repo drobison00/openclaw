@@ -216,7 +216,7 @@ describe("slash-state request routing", () => {
     }
   });
 
-  it("isolates unique authenticated capacity by account", async () => {
+  it("isolates distinct credentials across accounts", async () => {
     activate({ accountId: "a1", tokens: ["tok-a"] });
     activate({ accountId: "a2", tokens: ["tok-b"] });
     const route = createSlashRoute();
@@ -244,9 +244,9 @@ describe("slash-state request routing", () => {
     }
   });
 
-  it("shares authenticated capacity when a token matches multiple accounts", async () => {
-    activate({ accountId: "a1", tokens: ["tok-a", "tok-shared"] });
-    activate({ accountId: "a2", tokens: ["tok-shared"] });
+  it("collapses duplicate credentials without merging distinct duplicate groups", async () => {
+    activate({ accountId: "a1", tokens: ["tok-a", "tok-shared", "tok-shared-other"] });
+    activate({ accountId: "a2", tokens: ["tok-shared", "tok-shared-other"] });
     const route = createSlashRoute();
     const requests = Array.from({ length: 8 }, (_, index) =>
       createStalledRequest(`203.0.113.${index + 1}`, "Token tok-shared"),
@@ -256,7 +256,7 @@ describe("slash-state request routing", () => {
 
     const overflow = createResponse();
     await route.handler(createRequest("", "Token tok-shared"), overflow.res);
-    const unique = createStalledRequest("203.0.113.20", "Token tok-a");
+    const unique = createStalledRequest("203.0.113.20", "Token tok-shared-other");
     const uniqueResponse = createResponse();
     const uniqueRun = route.handler(unique, uniqueResponse.res);
 
