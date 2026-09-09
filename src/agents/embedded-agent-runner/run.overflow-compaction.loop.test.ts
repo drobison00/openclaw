@@ -279,6 +279,7 @@ describe("embedded run retry dispatch", () => {
       ask: "off",
       node: "session-node",
       nodeCwd: "/remote/default",
+      safeBins: [],
     });
   });
 
@@ -290,7 +291,7 @@ describe("embedded run retry dispatch", () => {
       turn: result.preparedAttempt as unknown as SessionPlacementTurnParams,
     });
 
-    expect(authority.exec).toEqual({ host: "sandbox", security: "deny", ask: "off" });
+    expect(authority.exec).toEqual({ host: "sandbox", security: "deny", ask: "off", safeBins: [] });
   });
 
   it("forwards private commit accounting before queued notices and thrown attempt cleanup", async () => {
