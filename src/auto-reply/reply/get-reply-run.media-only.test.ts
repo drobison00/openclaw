@@ -3144,6 +3144,9 @@ describe("runPreparedReply media-only handling", () => {
     const call = requireLastRunReplyAgentCall();
     expect(call?.followupRun.run.authProfileId).toBe("profile-after-wait");
     expect(vi.mocked(resolveSessionAuthSelection)).toHaveBeenCalledTimes(1);
+    expect(resolveSessionAuthSelection).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "default" }),
+    );
   });
 
   it("re-resolves same-session ownership after session-id rotation during async prep", async () => {
@@ -3789,9 +3792,15 @@ describe("runPreparedReply media-only handling", () => {
     expect(call?.followupRun.run.sourceReplyDeliveryMode).toBe("message_tool_only");
   });
 
-  it.each(["heartbeat", "cron", "exec"] as const)(
-    "keeps %s heartbeat metadata out of the model prompt",
-    async (source) => {
+  it.each([
+    ["heartbeat", undefined, "heartbeat", "[OpenClaw heartbeat poll]"],
+    ["cron", undefined, "cron", "[OpenClaw cron wake]"],
+    ["exec", undefined, "exec", "[OpenClaw exec completion]"],
+    ["heartbeat", "background-task", "background-task", "[OpenClaw session event]"],
+    ["heartbeat", "exec-event", "exec-event", "[OpenClaw exec completion]"],
+  ] as const)(
+    "keeps %s wake metadata private and preserves %s event provenance",
+    async (source, suppliedSourceTool, expectedSourceTool, transcriptPrompt) => {
       const heartbeatPrompt = "Read HEARTBEAT.md and run any due maintenance.";
       const syntheticConversationInfo =
         'Conversation info:\n```json\n{"chat_id":"discord:channel-123"}\n```';
@@ -3804,6 +3813,14 @@ describe("runPreparedReply media-only handling", () => {
           RawBody: heartbeatPrompt,
           CommandBody: heartbeatPrompt,
           InternalTurnSource: source,
+          ...(suppliedSourceTool
+            ? {
+                InputProvenance: {
+                  kind: "internal_system" as const,
+                  sourceTool: suppliedSourceTool,
+                },
+              }
+            : {}),
           ChatType: "direct",
           OriginatingChannel: "discord",
           OriginatingTo: "discord:channel-123",
@@ -3827,10 +3844,10 @@ describe("runPreparedReply media-only handling", () => {
         OriginatingChannel: "discord",
         OriginatingTo: "discord:channel-123",
       });
-      expect(call?.transcriptCommandBody).toBe("[OpenClaw heartbeat poll]");
-      expect(call?.followupRun.transcriptPrompt).toBe("[OpenClaw heartbeat poll]");
+      expect(call?.transcriptCommandBody).toBe(transcriptPrompt);
+      expect(call?.followupRun.transcriptPrompt).toBe(transcriptPrompt);
       expect(call?.followupRun.userTurnTranscriptRecorder?.message).toMatchObject({
-        provenance: { kind: "internal_system", sourceTool: "heartbeat" },
+        provenance: { kind: "internal_system", sourceTool: expectedSourceTool },
       });
     },
   );

@@ -21,6 +21,7 @@ import {
 import { createHarness, createRecoveryService } from "./placement-dispatch-test-harness.js";
 import type { createWorkerPlacementDispatchService } from "./placement-dispatch.js";
 import { createWorkerSessionPlacementStore } from "./placement-store.js";
+import { seedAttachedPlacementEnvironment } from "./placement-test-fixtures.js";
 import * as support from "./service.test-support.js";
 import type { WorkerTunnelManager } from "./tunnel.js";
 
@@ -31,7 +32,7 @@ describe("worker placement restart recovery", () => {
     "materializes a torn-down Gateway move before local recovery while its owner is %s",
     async (owner) => {
       const placements = createWorkerSessionPlacementStore({ database: support.testState.stateDb });
-      const original = createHarness(placements);
+      const original = createHarness(support.testState.stateDb, placements);
       const ready = support.seedReady(original.ready.environmentId);
       const environments = support.createService(support.createProvider());
       const attached = await environments.attachSession({
@@ -89,7 +90,9 @@ describe("worker placement restart recovery", () => {
         await fs.writeFile(file, "accepted repository result\n");
         expect(restartedStore.get(active.sessionId)?.state).toBe("reconciling");
       });
-      const restarted = createHarness(restartedStore, { prepareGatewayMove });
+      const restarted = createHarness(support.testState.stateDb, restartedStore, {
+        prepareGatewayMove,
+      });
       restarted.markEnvironmentDestroyed();
       let replacement: ReturnType<typeof restartedStore.get>;
       const recovering = restarted.service.reconcile();
@@ -108,6 +111,11 @@ describe("worker placement restart recovery", () => {
             sessionId: active.sessionId,
             expectedGeneration: reconciling.generation,
             recoveryError: "source replaced",
+          });
+          seedAttachedPlacementEnvironment(support.testState.stateDb, {
+            environmentId: "replacement-environment",
+            sessionId: REQUEST.sessionId,
+            ownerEpoch: 9,
           });
           replacement = seedActivePlacement(restartedStore, {
             environmentId: "replacement-environment",
@@ -143,7 +151,9 @@ describe("worker placement restart recovery", () => {
           database: support.testState.stateDb,
           now: () => 1_000,
         });
-        const harness = createHarness(placements, { workspacePath: support.testState.root });
+        const harness = createHarness(support.testState.stateDb, placements, {
+          workspacePath: support.testState.root,
+        });
         const active = harness.placements.seedActive(harness.attached.ownerEpoch);
         if (active.state !== "active") {
           throw new Error("retirement fixture did not produce an active placement");
@@ -286,7 +296,7 @@ describe("worker placement restart recovery", () => {
         database: support.testState.stateDb,
         now: () => 1_000,
       });
-      const harness = createHarness(placements, { destroyFails: true });
+      const harness = createHarness(support.testState.stateDb, placements, { destroyFails: true });
       await harness.environments.attachSession({
         environmentId: harness.ready.environmentId,
         ownerEpoch: harness.ready.ownerEpoch,
@@ -362,7 +372,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements);
+    const harness = createHarness(support.testState.stateDb, placements);
     await harness.environments.attachSession({
       environmentId: harness.ready.environmentId,
       ownerEpoch: harness.ready.ownerEpoch,
@@ -408,7 +418,7 @@ describe("worker placement restart recovery", () => {
         database: support.testState.stateDb,
         now: () => 1_000,
       });
-      const harness = createHarness(placements);
+      const harness = createHarness(support.testState.stateDb, placements);
       await harness.environments.attachSession({
         environmentId: harness.ready.environmentId,
         ownerEpoch: harness.ready.ownerEpoch,
@@ -456,7 +466,7 @@ describe("worker placement restart recovery", () => {
         database: support.testState.stateDb,
         now: () => 1_000,
       });
-      const harness = createHarness(placements);
+      const harness = createHarness(support.testState.stateDb, placements);
       const unrelatedEnvironment = {
         ...harness.attached,
         environmentId: "worker-unrelated-active",
@@ -520,7 +530,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements);
+    const harness = createHarness(support.testState.stateDb, placements);
     const provisioning = harness.placements.seedProvisioning();
     if (provisioning.state !== "provisioning") {
       throw new Error("recovery fixture did not produce a provisioning placement");
@@ -553,7 +563,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements);
+    const harness = createHarness(support.testState.stateDb, placements);
     const provisioning = harness.placements.seedProvisioning("remote-exec");
     if (provisioning.state !== "provisioning") {
       throw new Error("recovery fixture did not produce a provisioning placement");
@@ -580,7 +590,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements);
+    const harness = createHarness(support.testState.stateDb, placements);
     const provisioning = harness.placements.seedProvisioning();
     vi.mocked(harness.environments.get).mockReturnValue(undefined);
 
@@ -598,7 +608,7 @@ describe("worker placement restart recovery", () => {
       throw new Error("restart recovery did not fail the interrupted provisioning placement");
     }
 
-    const redispatch = createHarness(placements, {
+    const redispatch = createHarness(support.testState.stateDb, placements, {
       environmentGeneration: failed.generation + 1,
     });
     const active = await redispatch.service.dispatch(REQUEST);
@@ -617,7 +627,7 @@ describe("worker placement restart recovery", () => {
         database: support.testState.stateDb,
         now: () => 1_000,
       });
-      const harness = createHarness(placements);
+      const harness = createHarness(support.testState.stateDb, placements);
       const provisioning = harness.placements.seedProvisioning();
       const environment =
         state === "requested" || state === "provisioning"
@@ -667,7 +677,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements);
+    const harness = createHarness(support.testState.stateDb, placements);
     harness.placements.seedProvisioning();
     const environment =
       "state" in patch && patch.state === "failed"
@@ -697,7 +707,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements, {
+    const harness = createHarness(support.testState.stateDb, placements, {
       recoveryBarrierError: new Error(message),
     });
     const provisioning = harness.placements.seedProvisioning();
@@ -733,7 +743,7 @@ describe("worker placement restart recovery", () => {
         database: support.testState.stateDb,
         now: () => 1_000,
       });
-      const harness = createHarness(placements);
+      const harness = createHarness(support.testState.stateDb, placements);
       const original = harness.placements.seedProvisioning();
       if (original.state !== "provisioning" || !original.environmentId) {
         throw new Error("recovery fixture did not produce an owned provisioning placement");
@@ -835,7 +845,7 @@ describe("worker placement restart recovery", () => {
         database: support.testState.stateDb,
         now: () => 1_000,
       });
-      const harness = createHarness(placements, { failAt });
+      const harness = createHarness(support.testState.stateDb, placements, { failAt });
       const provisioning = harness.placements.seedProvisioning();
       if (provisioning.state !== "provisioning") {
         throw new Error("recovery fixture did not produce a provisioning placement");
@@ -857,7 +867,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const originalHarness = createHarness(placements);
+    const originalHarness = createHarness(support.testState.stateDb, placements);
     const active = originalHarness.placements.seedActive(2);
     if (active.state !== "active") {
       throw new Error("active placement fixture was not active");
@@ -880,7 +890,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 2_000,
     });
-    const restartedHarness = createHarness(restartedStore);
+    const restartedHarness = createHarness(support.testState.stateDb, restartedStore);
     restartedHarness.markEnvironmentOwnerEpoch(2);
     restartedHarness.markEnvironmentProtocolFeatures([WORKER_LAUNCH_V2_PROTOCOL_FEATURE]);
 
@@ -899,7 +909,7 @@ describe("worker placement restart recovery", () => {
       database: support.testState.stateDb,
       now: () => 1_000,
     });
-    const harness = createHarness(placements);
+    const harness = createHarness(support.testState.stateDb, placements);
     await harness.environments.attachSession({
       environmentId: harness.ready.environmentId,
       ownerEpoch: harness.ready.ownerEpoch,

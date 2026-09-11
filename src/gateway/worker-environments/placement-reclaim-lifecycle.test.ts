@@ -41,7 +41,7 @@ describe("placement reclaim with provider-owned node teardown", () => {
         reconcileChanged: false,
         reconcileCommitsManifest: false,
       };
-      let harness = createHarness(placements, harnessOptions);
+      let harness = createHarness(support.testState.stateDb, placements, harnessOptions);
       const environmentId = harness.ready.environmentId;
       const build = {
         ...support.BOOTSTRAP_RECEIPT,
@@ -87,16 +87,16 @@ describe("placement reclaim with provider-owned node teardown", () => {
         throw new Error("expected active placement");
       }
       if (operation === "recovery") {
-        placements.markWorkspaceResultPending(
-          placements.claimTurn({
-            ...REQUEST,
-            claimId: "pending-claim",
-            runId: "pending-run",
-            owner: { kind: "worker", environmentId, ownerEpoch: attached.ownerEpoch },
-          }),
-        );
+        const claim = placements.claimTurn({
+          ...REQUEST,
+          claimId: "pending-claim",
+          runId: "pending-run",
+          owner: { kind: "worker", environmentId, ownerEpoch: attached.ownerEpoch },
+        });
+        placements.markWorkspaceResultPending(claim);
+        placements.startWorkspaceResultDrain(claim);
         placements = createWorkerSessionPlacementStore({ database: support.testState.stateDb });
-        harness = createHarness(placements, harnessOptions);
+        harness = createHarness(support.testState.stateDb, placements, harnessOptions);
       }
       harness.markEnvironmentOwnerEpoch(attached.ownerEpoch);
       const transport = nodeSupport.transport();
@@ -348,7 +348,9 @@ describe("SSH placement cleanup after worker credential expiry", () => {
         database: support.testState.stateDb,
         now: () => support.testState.nowMs,
       });
-      const harness = createHarness(placements, { workspacePath: support.testState.root });
+      const harness = createHarness(support.testState.stateDb, placements, {
+        workspacePath: support.testState.root,
+      });
       const environmentId = harness.ready.environmentId;
       const identity = support.seedAttachedIdentity(environmentId, REQUEST.sessionId);
       const active = seedActivePlacement(placements, {

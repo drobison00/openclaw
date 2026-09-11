@@ -7,11 +7,7 @@ import type {
   WorkerInferenceStartParams,
   WorkerInferenceTerminalOutcome,
 } from "../../../packages/gateway-protocol/src/schema/worker-inference.js";
-import {
-  resolveAgentDir,
-  resolveAgentEffectiveModelPrimary,
-  resolveAgentWorkspaceDir,
-} from "../../agents/agent-scope.js";
+import { resolveAgentDir, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import { resolveSessionAuthSelection } from "../../agents/auth-profiles/session-override.js";
 import { applyExtraParamsToAgent } from "../../agents/embedded-agent-runner/extra-params.js";
 import { resolveModelAsync } from "../../agents/embedded-agent-runner/model.js";
@@ -38,10 +34,8 @@ import {
 } from "../../agents/prepared-model-runtime.js";
 import { projectProviderModelRouteConfig } from "../../agents/provider-model-route.js";
 import { registerProviderStreamForModel } from "../../agents/provider-stream.js";
-import {
-  prepareSimpleCompletionModel,
-  type PreparedSimpleCompletionModel,
-} from "../../agents/simple-completion-runtime.js";
+import { prepareSimpleCompletionModel } from "../../agents/simple-completion-runtime.js";
+import type { PreparedSimpleCompletionModel } from "../../agents/simple-completion.types.js";
 import { normalizeUsage, hasObservedModelUsage } from "../../agents/usage.js";
 import { getRuntimeConfig } from "../../config/config.js";
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
@@ -419,13 +413,6 @@ async function resolveApprovedModel(params: {
         runtimeLease.release();
         return undefined;
       }
-      const configuredDefaultProfile =
-        resolvedKey ===
-        resolveModelCatalogIdentityKey({ provider: defaultModel.provider, id: defaultModel.model })
-          ? splitTrailingAuthProfile(
-              resolveAgentEffectiveModelPrimary(lifecycleConfig, target.agentId) ?? "",
-            ).profile
-          : undefined;
       const harnessPolicy = resolveAgentHarnessPolicy({
         provider: resolved.ref.provider,
         modelId: resolved.ref.model,
@@ -442,7 +429,7 @@ async function resolveApprovedModel(params: {
         cfg: lifecycleConfig,
         provider: resolved.ref.provider,
         modelId: resolved.ref.model,
-        ...(configuredDefaultProfile ? { configuredProfileId: configuredDefaultProfile } : {}),
+        agentId: target.agentId,
         harnessRuntime: harnessPolicy.runtime,
         agentDir,
         sessionEntry: target.sessionEntry,
@@ -485,6 +472,7 @@ async function resolveApprovedModel(params: {
         provider: resolved.ref.provider,
         modelId: resolved.ref.model,
         agentDir,
+        modelIdSource: "selected",
         ...(selectedProfileId ? { profileId: selectedProfileId } : {}),
         ...(selectedProfileId ? { preferredProfile: selectedProfileId } : {}),
         ...(selectedProfileId ? { bindAuthOwner: true } : {}),

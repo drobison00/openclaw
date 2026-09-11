@@ -9,13 +9,42 @@ export type ModelCatalogReadScope = Pick<
   "agentId" | "sessionKey" | "authProfileId"
 >;
 
-export function modelCatalogRefreshError(result: ModelCatalogResult): string | null {
+export type ChatModelCatalogState = {
+  hasSnapshot: boolean;
+  refreshFailed?: boolean;
+  status: "idle" | "loading" | "ready" | "error" | "offline";
+};
+
+export function resolveModelCatalogState(
+  result: Pick<ModelCatalogResult, "models" | "refreshFailed">,
+  {
+    connected = true,
+    loading = false,
+    error = null,
+  }: {
+    connected?: boolean;
+    loading?: boolean;
+    error?: string | null;
+  } = {},
+): ChatModelCatalogState {
+  return {
+    hasSnapshot: result.models.length > 0 || (!loading && !error),
+    refreshFailed: result.refreshFailed,
+    status: !connected ? "offline" : error ? "error" : loading ? "loading" : "ready",
+  };
+}
+
+export function modelCatalogRefreshError(
+  result: ModelCatalogResult,
+  failureMessage?: string,
+): string | null {
   return result.refreshFailed
-    ? t(
-        result.models.length
-          ? "chat.modelControls.modelsRefreshFailed"
-          : "chat.modelControls.modelsUnavailable",
-      )
+    ? (failureMessage ??
+        t(
+          result.models.length
+            ? "chat.modelControls.modelsRefreshFailed"
+            : "chat.modelControls.modelsUnavailable",
+        ))
     : null;
 }
 

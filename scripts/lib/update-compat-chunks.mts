@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import type ts from "typescript";
 import { parseReleaseVersion } from "./release-version.mjs";
+import { getTypeScript } from "./ts-guard-utils.mts";
 import {
   isUpdateCompatibilityChunk,
   UPDATE_COMPATIBILITY_CHUNK_HEADER,
@@ -78,10 +79,12 @@ function ownerAt(source: string, offset: number): string | undefined {
 }
 
 function parseModule(file: string, source: string): ts.SourceFile {
+  const ts = getTypeScript();
   return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
 }
 
 function namedBinding(node: ts.BindingName): string[] {
+  const ts = getTypeScript();
   if (ts.isIdentifier(node)) {
     return [node.text];
   }
@@ -91,6 +94,7 @@ function namedBinding(node: ts.BindingName): string[] {
 }
 
 function inspectModule(file: string, source: string, sourceModule?: string): ModuleInfo {
+  const ts = getTypeScript();
   const info: ModuleInfo = {
     imports: new Map(),
     exports: new Map(),
@@ -255,11 +259,11 @@ class ModuleGraph {
     return [...matches.values()];
   }
 
-  private sourceOrigin(
+  private singleBinding(
     file: string,
     symbol: string,
     bindings: ModuleBinding[],
-  ): UpdateCompatibilityOrigin | undefined {
+  ): ModuleBinding | undefined {
     if (bindings.length > 1) {
       throw new Error(
         `Ambiguous export ${file}:${symbol}; conflicting sources: ${bindings
@@ -268,19 +272,24 @@ class ModuleGraph {
           .join(", ")}`,
       );
     }
-    return bindings[0]?.origin;
+    return bindings[0];
+  }
+
+  binding(file: string, symbol: string): ModuleBinding | undefined {
+    return this.singleBinding(file, symbol, this.resolveExport(file, symbol));
   }
 
   origin(file: string, symbol: string): UpdateCompatibilityOrigin | undefined {
-    return this.sourceOrigin(file, symbol, this.resolveExport(file, symbol));
+    return this.binding(file, symbol)?.origin;
   }
 
   localOrigin(file: string, symbol: string): UpdateCompatibilityOrigin | undefined {
-    return this.sourceOrigin(file, symbol, this.resolveLocal(file, symbol, new Set()));
+    return this.singleBinding(file, symbol, this.resolveLocal(file, symbol, new Set()))?.origin;
   }
 }
 
 function consumedExports(node: ts.CallExpression): string[] | undefined {
+  const ts = getTypeScript();
   let expression: ts.Node = node;
   let awaited = false;
   while (
@@ -355,6 +364,7 @@ export function recordUpdateCompatibilityRelease(params: {
     ) {
       continue;
     }
+    const ts = getTypeScript();
     const visit = (node: ts.Node) => {
       if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
         const owner = ownerAt(source, node.getStart());
@@ -612,10 +622,15 @@ export function writeUpdateCompatibilityChunks(params: {
     }
   }
   const ownerModules = new Set([...origins.values()].map((origin) => origin.module));
-  const candidates = new Map<string, Array<{ file: string; exported: string }>>();
+  const candidates = new Map<string, Map<string, { file: string; exported: string }>>();
   for (const file of moduleFiles(distDir)) {
     const relative = portable(path.relative(distDir, file));
-    if (relative.startsWith("extensions/") || relative.startsWith("plugin-sdk/")) {
+    // Retained config repairs are built separately from the updater's runtime graph.
+    if (
+      relative.startsWith("extensions/") ||
+      relative.startsWith("plugin-sdk/") ||
+      relative.startsWith("config-doctor/")
+    ) {
       continue;
     }
     const source = fs.readFileSync(file, "utf8");
@@ -628,13 +643,19 @@ export function writeUpdateCompatibilityChunks(params: {
       continue;
     }
     for (const exported of graph.names(file)) {
-      const origin = graph.origin(file, exported);
-      if (!origin) {
+      const binding = graph.binding(file, exported);
+      const origin = binding?.origin;
+      if (!binding || !origin) {
         continue;
       }
       const key = `${origin.module}:${origin.symbol}`;
-      const matches = candidates.get(key) ?? [];
-      matches.push({ file: relative, exported });
+      const matches = candidates.get(key) ?? new Map<string, { file: string; exported: string }>();
+      const bindingKey = `${binding.file}:${binding.symbol}`;
+      const previous = matches.get(bindingKey);
+      // Prefer the declaration's own export; sorted files/names break alias ties.
+      if (!previous || (file === binding.file && previous.file !== relative)) {
+        matches.set(bindingKey, { file: relative, exported });
+      }
       candidates.set(key, matches);
     }
   }
@@ -672,7 +693,7 @@ export function writeUpdateCompatibilityChunks(params: {
     const lines = [UPDATE_COMPATIBILITY_CHUNK_HEADER];
     for (const entry of chunk.exports) {
       const origin = origins.get(`${entry.origin.module}:${entry.origin.symbol}`)!;
-      const matches = candidates.get(`${origin.module}:${origin.symbol}`) ?? [];
+      const matches = [...(candidates.get(`${origin.module}:${origin.symbol}`)?.values() ?? [])];
       const match = matches[0];
       if (matches.length !== 1 || !match) {
         throw new Error(
