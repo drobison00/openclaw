@@ -6,6 +6,7 @@ import {
   WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
+import { createDeferred } from "../../../test/helpers/promise.js";
 import { runCommandWithTimeout } from "../../process/exec.js";
 import {
   closeOpenClawStateDatabaseForTest,
@@ -369,10 +370,7 @@ describe("staged worker placement result recovery", () => {
       }),
     ).toMatchObject({ kind: "execute" });
     placementStore.handoffWorkspaceResultRecovery(claim);
-    let signalToolAdmissionClosed!: () => void;
-    const toolAdmissionClosed = new Promise<void>((resolve) => {
-      signalToolAdmissionClosed = resolve;
-    });
+    const { promise: toolAdmissionClosed, resolve: signalToolAdmissionClosed } = createDeferred();
     const closeWorkerTurnToolState = placementStore.closeWorkerTurnToolState.bind(placementStore);
     // Reconciliation performs real Git I/O before reaching this boundary, so
     // synchronize on admission closure instead of a wall-clock polling budget.

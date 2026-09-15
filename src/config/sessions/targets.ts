@@ -299,7 +299,7 @@ export function resolveAllAgentSessionStoreTargetsSync(
 export function resolveExistingAgentSessionStoreTargetsSync(
   cfg: OpenClawConfig,
   agentId: string,
-  params: { env?: NodeJS.ProcessEnv } = {},
+  params: { env?: NodeJS.ProcessEnv; excludeStorePath?: string } = {},
 ): SessionStoreTarget[] {
   const env = params.env ?? process.env;
   const requested = normalizeAgentId(agentId);
@@ -331,6 +331,10 @@ export function resolveExistingAgentSessionStoreTargetsSync(
     ) {
       return [];
     }
+    // Validate ownership even when the caller already has this fixed target.
+    if (fixedTarget.storePath === params.excludeStorePath) {
+      return [];
+    }
     const sqlitePath = resolvedTarget.path;
     if (sqlitePath && fsSync.existsSync(sqlitePath)) {
       try {
@@ -360,16 +364,18 @@ export function resolveExistingAgentSessionStoreTargetsSync(
     return [];
   }
   // Validate the runtime SQLite artifact once; Doctor's broader discovery still accepts JSON.
-  const targets = resolveAgentSessionStoreTargets(cfg, requested, { env, sqliteOnly: true });
-  if (isConfiguredSessionStoreAgentId(cfg, requested)) {
-    return targets;
+  let targets = resolveAgentSessionStoreTargets(cfg, requested, { env, sqliteOnly: true });
+  if (!isConfiguredSessionStoreAgentId(cfg, requested)) {
+    // Always run sqlite-target dedupe for retired/manual agents: it probes the agent database
+    // registry, so an unreadable registry surfaces as an ambiguous-ownership result rather than a
+    // silent "absent" verdict in placement evidence (see server-worker-placement-session-evidence
+    // "keeps a placement when the agent database registry is unreadable"). Retired/manual lookups are
+    // not the configured-agent hot path, so the registry probe cost is acceptable here.
+    targets = dedupeSessionStoreTargetsBySqliteTarget(targets, { defaultAgentId, env });
   }
-  // Always run sqlite-target dedupe for retired/manual agents: it probes the agent database
-  // registry, so an unreadable registry surfaces as an ambiguous-ownership result rather than a
-  // silent "absent" verdict in placement evidence (see server-worker-placement-session-evidence
-  // "keeps a placement when the agent database registry is unreadable"). Retired/manual lookups are
-  // not the configured-agent hot path, so the registry probe cost is acceptable here.
-  return dedupeSessionStoreTargetsBySqliteTarget(targets, { defaultAgentId, env });
+  return params.excludeStorePath === undefined
+    ? targets
+    : targets.filter((target) => target.storePath !== params.excludeStorePath);
 }
 
 /**
@@ -630,9 +636,6 @@ export function resolveSessionStoreTargets(
     const defaultAgentId =
       requestedAgentId ??
       (persistedStoreOwner.kind === "configured" ? persistedStoreOwner.agentId : undefined) ??
-      // Session-store selection enumerates agents: silently adopting the system
-      // agent would hide the other agents' sessions, so this stays explicit and
-      // offers --agent/--all-agents instead of the ambient owner chain.
       tryResolveLegacyCompatibilityAgentId(cfg) ??
       resolveDefaultAgentId(cfg);
     if (hasAgent) {
@@ -683,7 +686,6 @@ export function resolveSessionStoreTargets(
   }
   const defaultAgentId =
     (persistedStoreOwner.kind === "configured" ? persistedStoreOwner.agentId : undefined) ??
-    // Explicit selection, not ambient ownership: see listConfiguredSessionStoreAgentIds.
     tryResolveLegacyCompatibilityAgentId(cfg) ??
     resolveDefaultAgentId(cfg);
   return [

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, vi } from "vitest";
+import { WebSocket } from "ws";
 import {
   WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
@@ -118,7 +119,7 @@ test.for(["direct", "restart"] as const)(
             }
             return result;
           });
-          kernel.registerGatewayLifetimeSidecars([{ stop: stopDependencies }]);
+          kernel.registerGatewayLifetimeSidecars({ stop: stopDependencies });
           node = await connectGatewayClient({
             url: `ws://127.0.0.1:${port}`,
             token: "secret",
@@ -166,6 +167,12 @@ test.for(["direct", "restart"] as const)(
               }
             },
           });
+          const ping = vi.spyOn(WebSocket.prototype, "ping");
+          await expect(
+            kernel.nodeRegistry.checkConnectivity(pairedNode.identity.deviceId),
+          ).resolves.toEqual({ ok: true });
+          expect(ping).toHaveBeenCalledOnce();
+          ping.mockRestore();
           await node.request("node.runnerInventory.update", {
             protocolFeatures: [NODE_WORKER_SUPERVISOR_PROTOCOL_FEATURE],
             workerHost: {
