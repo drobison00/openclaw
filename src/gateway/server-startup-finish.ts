@@ -131,8 +131,6 @@ export async function finishGatewayStartup(params: {
     postReadyState,
     cronStartState,
     prepareReloadCandidate,
-    startupLastGoodSnapshot,
-    startupInternalWriteHash,
     configSnapshot,
     channelManager,
     activateRuntimeSecrets,
@@ -220,10 +218,7 @@ export async function finishGatewayStartup(params: {
         cfgAtStart,
         deps,
         sessionDeliveryRecoveryMaxEnqueuedAt,
-        cronState: runtimeState.cronState,
-        cronReconciliation,
-        startCron: false,
-        logCron,
+        cronEnabled: runtimeState.cronState.cronEnabled,
         log,
         resolveGatewayContext: resolvePluginGatewayContext,
       });
@@ -422,15 +417,12 @@ export async function finishGatewayStartup(params: {
     minimalTestGateway,
     initialConfig: cfgAtStart,
     initialPluginInstallRecords: pluginMetadataSnapshot?.index.installRecords,
-    initialCompareConfig: startupLastGoodSnapshot.sourceConfig,
-    initialSnapshotRawHash: startupLastGoodSnapshot.exists
-      ? hashConfigRaw(startupLastGoodSnapshot.raw)
-      : null,
-    initialAuthoredConfig: startupLastGoodSnapshot.parsed,
-    initialIncludedPaths: startupLastGoodSnapshot.includedPaths ?? [],
-    initialSnapshotValid: startupLastGoodSnapshot.valid,
-    initialSnapshotIssues: startupLastGoodSnapshot.issues,
-    initialInternalWriteHash: startupInternalWriteHash,
+    initialCompareConfig: configSnapshot.sourceConfig,
+    initialSnapshotRawHash: configSnapshot.exists ? hashConfigRaw(configSnapshot.raw) : null,
+    initialAuthoredConfig: configSnapshot.parsed,
+    initialIncludedPaths: configSnapshot.includedPaths ?? [],
+    initialSnapshotValid: configSnapshot.valid,
+    initialSnapshotIssues: configSnapshot.issues,
     watchPath: configSnapshot.path,
     readSnapshot: readConfigFileSnapshotForRuntimeTransaction,
     promoteSnapshot: promoteConfigSnapshotToLastKnownGood,
@@ -453,7 +445,7 @@ export async function finishGatewayStartup(params: {
           // must not classify a hot write as a restart and bypass this validation.
           const plan = buildGatewayReloadPlan(
             diffGatewayReloadPaths(
-              getRuntimeConfigSourceSnapshot() ?? startupLastGoodSnapshot.sourceConfig,
+              getRuntimeConfigSourceSnapshot() ?? configSnapshot.sourceConfig,
               sourceConfig,
               listConfigReloadRefinementPrefixes(),
             ),
@@ -566,7 +558,7 @@ export async function finishGatewayStartup(params: {
   if (lifecycle.closePreludeStarted) {
     return { startupSettled: postAttachHandles.startupSettled };
   }
-  await promoteConfigSnapshotToLastKnownGood(startupLastGoodSnapshot).catch((err: unknown) => {
+  await promoteConfigSnapshotToLastKnownGood(configSnapshot).catch((err: unknown) => {
     log.warn(`gateway: failed to promote config last-known-good backup: ${String(err)}`);
   });
   if (!minimalTestGateway) {
@@ -578,6 +570,7 @@ export async function finishGatewayStartup(params: {
         postReadyState.maintenanceTimer = null;
       },
       startMaintenance: async () => {
+        await params.waitForPostReadyWork();
         if (lifecycle.closePreludeStarted) {
           return null;
         }

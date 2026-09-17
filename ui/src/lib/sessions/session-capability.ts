@@ -185,6 +185,8 @@ export type SessionCapability = {
     ) => GitHubPublicationBinding | null;
   };
   readonly state: SessionState;
+  /** Memory-only roster presentation; never authority for mutations or live row observations. */
+  readonly presentation: Pick<SessionState, "result" | "agentId" | "resultCached">;
   /** Advances only when a canonical sessions.list result is published. */
   readonly canonicalListRevision: number;
   whenCachedRosterSettled: () => Promise<void>;
@@ -204,7 +206,7 @@ export type SessionCapability = {
     listener: (snapshot: SessionListSnapshot) => void,
   ) => { refresh: () => Promise<void>; dispose: () => void };
   refreshList: (options?: SessionRefreshOptions) => Promise<void>;
-  /** Admits history through the deletion fence, even when outside the shared roster. */
+  /** Admits history through lifecycle fences; defaults-only never authorizes row publication. */
   reconcile: (
     row: GatewaySessionRow | undefined,
     defaults?: SessionsListResult["defaults"],
@@ -212,7 +214,7 @@ export type SessionCapability = {
       sourceCanonicalListRevision?: number;
       sourceListScope?: SessionListScope;
     },
-  ) => boolean;
+  ) => boolean | "defaults-only";
   /** Captures request ordering before a supplemental row read begins. */
   captureReconcile: () => SessionCapability["reconcile"];
   /** Owns a routed descriptor through reads and events until its consumer retires. */
