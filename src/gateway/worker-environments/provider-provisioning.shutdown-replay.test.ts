@@ -5,7 +5,7 @@ import {
   GATEWAY_CLIENT_MODES,
 } from "../../../packages/gateway-protocol/src/client-info.js";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { NODE_WORKER_SUPERVISOR_PROTOCOL_FEATURE } from "../../infra/node-runner-inventory.js";
@@ -75,7 +75,7 @@ describe("worker node provisioning shutdown replay", () => {
       ...support.BUNDLE_ARTIFACT,
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
     }));
     let placements = createWorkerSessionPlacementStore({
@@ -119,7 +119,7 @@ describe("worker node provisioning shutdown replay", () => {
       ...support.BOOTSTRAP_RECEIPT,
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
     };
     const first = support.createService(provider, {

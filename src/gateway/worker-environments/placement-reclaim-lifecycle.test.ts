@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { createDeferred } from "../../../test/helpers/promise.js";
@@ -47,7 +47,7 @@ describe("placement reclaim with provider-owned node teardown", () => {
         ...support.BOOTSTRAP_RECEIPT,
         protocolFeatures: [
           WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-          WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+          WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
         ],
       };
       support.testState.prepareInstallation = async () => ({

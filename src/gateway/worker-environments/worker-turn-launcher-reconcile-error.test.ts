@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
   WORKER_RPC_SET_VERSION,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
@@ -45,7 +45,7 @@ describe("worker turn recovery after environment reconciliation errors", () => {
       ...BUNDLE_ARTIFACT,
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
     };
     const nodeTransport = transport();

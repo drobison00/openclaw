@@ -2,7 +2,7 @@ import path from "node:path";
 import { expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { runQaGatewayFixture } from "../../test/helpers/qa-gateway-cleanup.js";
@@ -210,7 +210,7 @@ test.for(["direct", "restart"] as const)(
                 openclawVersion: "2026.8.19",
                 protocolFeatures: [
                   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-                  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+                  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
                 ],
                 installKind: "bundle",
               },

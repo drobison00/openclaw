@@ -159,7 +159,6 @@ describe("resolveWorkerToolAuthority", () => {
         security: "full",
         ask: "off",
         node: "session-node",
-        nodeCwd: "/remote/session/workspace",
       },
     },
   ])("preserves session-owned exec $name at the worker boundary", ({ execSession, expected }) => {

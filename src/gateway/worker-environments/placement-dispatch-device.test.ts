@@ -4,7 +4,7 @@ import {
   GATEWAY_CLIENT_MODES,
 } from "../../../packages/gateway-protocol/src/client-info.js";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { useAutoCleanupTempDirTracker } from "../../../test/helpers/temp-dir.js";
@@ -140,7 +140,7 @@ describe("device worker placement dispatch", () => {
         openclawVersion: "2026.8.12",
         protocolFeatures: [
           WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-          WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+          WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
         ],
         installKind: "bundle",
       },

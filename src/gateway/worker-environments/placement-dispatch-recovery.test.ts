@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
   WORKER_LAUNCH_V2_PROTOCOL_FEATURE,
   type WorkerAdmissionHandshake,
@@ -932,7 +932,7 @@ describe("worker placement restart recovery", () => {
         ...support.BOOTSTRAP_RECEIPT,
         protocolFeatures: [
           WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-          WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+          WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
         ],
       };
       let currentBundle: WorkerInstallationArtifact = {

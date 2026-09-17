@@ -2671,7 +2671,6 @@ describe("worker runtime", () => {
       exec: {
         host: "node",
         node: "worker-node",
-        nodeCwd: "/remote/default",
         security: "full",
         ask: "off",
       },

@@ -109,21 +109,19 @@ function parseToolAuthority(value: unknown): WorkerToolAuthority | undefined {
   if (!isRecord(exec)) {
     return undefined;
   }
-  const { host, security, ask, node, nodeCwd, safeBins } = exec;
+  const { host, security, ask, node, safeBins } = exec;
   if (
     !hasExactOwnKeys(
       exec,
       ["host", "security", "ask"],
-      host === "node" ? ["node", "nodeCwd", "safeBins"] : ["safeBins"],
+      host === "node" ? ["node", "safeBins"] : ["safeBins"],
     ) ||
     (Object.hasOwn(exec, "safeBins") && (!Array.isArray(safeBins) || safeBins.length !== 0)) ||
     (host !== "sandbox" && host !== "gateway" && host !== "node") ||
     (security !== "deny" && security !== "allowlist" && security !== "full") ||
     (ask !== "off" && ask !== "on-miss" && ask !== "always") ||
     (node !== undefined &&
-      (host !== "node" || typeof node !== "string" || node.length === 0 || node.trim() !== node)) ||
-    (Object.hasOwn(exec, "nodeCwd") &&
-      (typeof nodeCwd !== "string" || nodeCwd.length === 0 || nodeCwd.trim() !== nodeCwd))
+      (host !== "node" || typeof node !== "string" || node.length === 0 || node.trim() !== node))
   ) {
     return undefined;
   }
@@ -134,7 +132,6 @@ function parseToolAuthority(value: unknown): WorkerToolAuthority | undefined {
           security,
           ask,
           ...(typeof node === "string" ? { node } : {}),
-          ...(typeof nodeCwd === "string" ? { nodeCwd } : {}),
         }
       : { host, security, ask };
   return {

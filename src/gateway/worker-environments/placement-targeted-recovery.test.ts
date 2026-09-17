@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { createDeferredCore } from "../../shared/deferred.js";
@@ -24,7 +24,7 @@ function seedAttached(environmentId: string) {
       ...support.BOOTSTRAP_RECEIPT,
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
     }),
   });
@@ -71,7 +71,7 @@ describe("targeted worker placement recovery", () => {
       ...support.BUNDLE_ARTIFACT,
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
     });
   });

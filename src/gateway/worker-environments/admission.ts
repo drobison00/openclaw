@@ -3,7 +3,7 @@ import {
   type WorkerAdmissionHandshake,
   type WorkerConnectParams,
   type WorkerProtocolCloseReason,
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
   WORKER_RPC_SET_VERSION,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
@@ -38,7 +38,7 @@ export function supportsCurrentWorkerLaunch(
 ): boolean {
   return (
     handshake?.protocolFeatures.includes(WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE) === true &&
-    handshake.protocolFeatures.includes(WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE)
+    handshake.protocolFeatures.includes(WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE)
   );
 }
 

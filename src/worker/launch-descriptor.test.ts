@@ -502,7 +502,6 @@ describe("worker launch descriptor", () => {
                   security,
                   ask,
                   node: "worker-node",
-                  nodeCwd: "/remote/workspace",
                 }
               : { host, security, ask };
           expect(parseWorkerLaunchDescriptor(structuredClone(descriptor))).toEqual(descriptor);

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { vi } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import {
@@ -278,7 +278,7 @@ export function attachedEnvironment(): WorkerTurnEnvironmentRecord {
       openclawVersion: "2026.7.2",
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
       installKind: "bundle",
     },

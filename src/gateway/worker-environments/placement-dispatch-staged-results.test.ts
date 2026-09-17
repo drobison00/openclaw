@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { createDeferred } from "../../../test/helpers/promise.js";
@@ -245,7 +245,7 @@ describe("staged worker placement result recovery", () => {
         ...support.BUNDLE_ARTIFACT,
         protocolFeatures: [
           WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-          WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+          WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
         ],
       });
       const environments = support.createService(support.createProvider({ destroy }), {

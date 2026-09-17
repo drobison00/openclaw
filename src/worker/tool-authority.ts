@@ -44,10 +44,7 @@ type WorkerExecAuthority = {
   ask: ExecAsk;
   /** No host-specific approvals or default safe bins may be reconstructed remotely. */
   safeBins?: [];
-} & (
-  | { host: Exclude<ExecHost, "node">; node?: never; nodeCwd?: never }
-  | { host: "node"; node?: string; nodeCwd?: string }
-);
+} & ({ host: Exclude<ExecHost, "node">; node?: never } | { host: "node"; node?: string });
 
 export type WorkerToolAuthority = {
   allowedToolNames: WorkerToolName[];

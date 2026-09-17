@@ -1,5 +1,5 @@
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
   type WorkerAdmissionHandshake,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
@@ -115,7 +115,7 @@ export function createDispatchEnvironmentFixtures(generation = 1) {
     openclawVersion: "2026.7.2",
     protocolFeatures: [
       WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-      WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+      WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
     ],
   };
   const sshEndpoint: WorkerSshEndpoint = {

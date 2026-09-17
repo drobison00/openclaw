@@ -258,7 +258,6 @@ async function runWorkerEmbeddedTurnWithResources(
       safeBins: execAuthority.safeBins ?? [],
       host: execAuthority.host,
       node: execAuthority.host === "node" ? execAuthority.node : undefined,
-      nodeCwd: execAuthority.host === "node" ? execAuthority.nodeCwd : undefined,
       security: execSecurity,
       ask: execAsk,
       ...(execMode ? { mode: execMode } : {}),

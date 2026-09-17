@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { createDeferredCore } from "../../shared/deferred.js";
 import {
@@ -31,7 +31,7 @@ describe("worker placement shutdown replay", () => {
       ...support.BUNDLE_ARTIFACT,
       protocolFeatures: [
         WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-        WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+        WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
       ],
     });
     const interrupted = createDeferredCore<never>();

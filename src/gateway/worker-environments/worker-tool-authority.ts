@@ -107,8 +107,6 @@ export function resolveWorkerToolAuthority(params: {
   const { effectiveHost: host, security, node: configuredNode } = defaults;
   const ask = policy.ask ?? defaults.ask;
   const node = configuredNode?.trim();
-  const nodeCwd =
-    node && node === turn.execSession?.execNode ? turn.execSession.execCwd?.trim() : undefined;
   // Executable paths, safe-bin profiles, and command approvals are host-specific.
   // Until a portable allowlist exists, transmit an explicit empty safe-bin cap.
   const exec: NonNullable<WorkerToolAuthority["exec"]> =
@@ -119,7 +117,6 @@ export function resolveWorkerToolAuthority(params: {
           ask,
           safeBins: [],
           ...(node ? { node } : {}),
-          ...(nodeCwd ? { nodeCwd } : {}),
         }
       : { host, security, ask, safeBins: [] };
   if (turn.disableTools === true || turn.modelRun === true || turn.promptMode === "none") {

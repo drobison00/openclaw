@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, test } from "vitest";
 import {
-  WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+  WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
 } from "../../packages/gateway-protocol/src/schema/worker-admission.js";
 import type { WorkerProvider, WorkerSshEndpoint } from "../plugins/types.js";
@@ -51,7 +51,7 @@ const RECEIPT = {
   openclawVersion: "2026.8.1",
   protocolFeatures: [
     WORKER_EXECUTION_CONTEXT_PROTOCOL_FEATURE,
-    WORKER_EXEC_AUTHORITY_PROTOCOL_FEATURE,
+    WORKER_EXECUTION_AUTHORITY_PROTOCOL_FEATURE,
   ],
 };
 const INSTALLATION: WorkerInstallationArtifact = {
