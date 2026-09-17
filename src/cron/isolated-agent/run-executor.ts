@@ -156,8 +156,7 @@ function resolveIsolatedCronPromptCacheKey(params: {
 
 /** Detects single-line cron prompts that look like shell commands or command invocations. */
 function isCommandStyleCronMessage(message: string): boolean {
-  const trimmed = message.trim();
-  return !trimmed.includes("\n") && COMMAND_STYLE_CRON_PREFIX.test(trimmed);
+  return !message.trim().includes("\n") && COMMAND_STYLE_CRON_PREFIX.test(message.trim());
 }
 
 function resolveCronBootstrapContextMode(

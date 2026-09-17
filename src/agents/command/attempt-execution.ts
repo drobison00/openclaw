@@ -1752,10 +1752,7 @@ function finalizeAcpToolsForRun(
 }
 
 function resolvePresentProxyEnvKeys(env: NodeJS.ProcessEnv = process.env): string[] {
-  return ACP_PROXY_ENV_KEYS.filter((key) => {
-    const value = env[key];
-    return typeof value === "string" && value.trim().length > 0;
-  });
+  return ACP_PROXY_ENV_KEYS.filter((key) => Boolean(env[key]?.trim()));
 }
 
 function sanitizeAcpDiagnosticText(value: string): string {
