@@ -838,8 +838,7 @@ function createCronPromptExecutor(
           authProfileIdSource: params.liveSelection.authProfileId
             ? params.liveSelection.authProfileIdSource
             : undefined,
-          // Scheduled run: keep bursty cron overloaded/rate_limit local, while
-          // still sharing real credential/account failures across auth profiles.
+          // Cron keeps overload failures local while sharing real credential failures.
           authProfileFailurePolicy: runOptions.authProfileFailurePolicy ?? "local_transient",
           // Fallback selection is turn-local. Revalidate the stored or
           // requested level without rewriting the durable preference.
