@@ -73,8 +73,9 @@ export function projectEffectiveExecPolicy(params: {
     ? resolveSessionPermissionExecPolicy(params.permissionPolicy, params.overrides)
     : applyExecPolicyLayer(params.base, params.overrides);
   const target = params.scheduledExecTarget;
+  const host = params.overrides?.host ?? params.base.host;
   return {
-    host: target?.host ?? params.overrides?.host ?? params.base.host,
+    host: host === undefined || host === "auto" ? (target?.host ?? host) : host,
     mode: target?.ask ? undefined : policy.mode,
     security: policy.security,
     ask: target?.ask ?? policy.ask,

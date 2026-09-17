@@ -278,7 +278,6 @@ describe("embedded run retry dispatch", () => {
       security: "full",
       ask: "off",
       node: "session-node",
-      nodeCwd: "/remote/default",
       safeBins: [],
     });
   });
