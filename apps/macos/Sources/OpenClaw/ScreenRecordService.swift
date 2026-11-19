@@ -51,7 +51,12 @@ final class ScreenRecordService {
 
         let excludedApplications: [SCRunningApplication]
         if ApprovalPromptState.shared.isPending {
-            let content = try await SCShareableContent.current
+            let content: SCShareableContent
+            do {
+                content = try await SCShareableContent.current
+            } catch {
+                throw PermissionManager.screenCaptureFailure(error)
+            }
             excludedApplications = content.applications.filter {
                 $0.processID == ProcessInfo.processInfo.processIdentifier
             }
