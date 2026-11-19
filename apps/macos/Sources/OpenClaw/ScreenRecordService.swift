@@ -60,6 +60,7 @@ final class ScreenRecordService {
         }
         let excludesApplication = !excludedApplications.isEmpty
         try ApprovalPromptState.shared.checkScreenCapture(excludesApplication: excludesApplication)
+        let startedAtGeneration = ApprovalPromptState.shared.pendingGeneration
         let filter = SCContentFilter(
             display: display,
             excludingApplications: excludedApplications,
@@ -74,6 +75,10 @@ final class ScreenRecordService {
             config.capturesAudio = true
         }
 
+        var keepOutput = false
+        defer {
+            if !keepOutput { try? FileManager().removeItem(at: outURL) }
+        }
         let recorder = try StreamRecorder(
             outputURL: outURL,
             width: display.width,
@@ -95,16 +100,15 @@ final class ScreenRecordService {
             try await stream.stopCapture()
         } catch {
             if started { try? await stream.stopCapture() }
-            throw PermissionManager.screenCaptureFailure(error)
+            throw error
         }
 
         try await recorder.finish()
-        do {
-            try ApprovalPromptState.shared.checkScreenCapture(excludesApplication: excludesApplication)
-        } catch {
-            try FileManager.default.removeItem(at: outURL)
-            throw error
-        }
+        try Task.checkCancellation()
+        try ApprovalPromptState.shared.checkScreenRecording(
+            excludesApplication: excludesApplication,
+            startedAtGeneration: startedAtGeneration)
+        keepOutput = true
         return (path: outURL.path, durationMs: durationMs, fps: fps, hasAudio: recorder.hasAudio)
     }
 }
