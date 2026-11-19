@@ -11,10 +11,63 @@ import {
   resolveChannelGroupsConfigPath,
   resolveToolsBySender,
 } from "./group-policy.js";
+import {
+  buildChannelGroupsScopeTree,
+  resolveScopeRequireMention,
+  resolveScopeToolsPolicy,
+} from "./group-scope-tree.js";
 
 describe("resolveChannelGroupPolicy", () => {
   const whatsapp = (config: Record<string, unknown>) =>
     ({ channels: { whatsapp: config } }) as OpenClawConfig;
+
+  it.each(["ops.team", "Ops Team", "ops-team"])(
+    "uses group restrictions from the Telegram account stored as %s",
+    (accountKey) => {
+      const groups = { "-1001": { requireMention: true, tools: { deny: ["exec"] } } };
+      const cfg = {
+        channels: {
+          telegram: {
+            groupPolicy: "open",
+            groups: { "*": { requireMention: false, tools: { allow: ["read"] } } },
+            accounts: { [accountKey]: { groupPolicy: "allowlist", groups }, other: {} },
+          },
+        },
+      } satisfies OpenClawConfig;
+      const params = { cfg, channel: "telegram", accountId: "ops-team" } as const;
+      const scope = {
+        tree: buildChannelGroupsScopeTree(cfg, "telegram", "ops-team"),
+        path: ["-1001"],
+      };
+      expect({
+        unlistedAllowed: resolveChannelGroupPolicy({ ...params, groupId: "-1002" }).allowed,
+        requireMention: resolveScopeRequireMention(scope),
+        tools: resolveScopeToolsPolicy({ ...scope, messageProvider: "telegram" }),
+        groupsPath: resolveChannelGroupsConfigPath({ ...params, groups }),
+      }).toEqual({
+        unlistedAllowed: false,
+        requireMention: true,
+        tools: { deny: ["exec"] },
+        groupsPath: `channels.telegram.accounts[${JSON.stringify(accountKey)}].groups`,
+      });
+    },
+  );
+
+  it("enforces a Telegram account allowlist without an explicit groups map", () => {
+    const cfg = {
+      channels: {
+        telegram: { groupPolicy: "open", accounts: { "Ops Team": { groupPolicy: "allowlist" } } },
+      },
+    } satisfies OpenClawConfig;
+    expect(
+      resolveChannelGroupPolicy({
+        cfg,
+        channel: "telegram",
+        accountId: "ops-team",
+        groupId: "-1002",
+      }),
+    ).toMatchObject({ allowlistEnabled: true, allowed: false });
+  });
 
   it.each([
     {
@@ -35,6 +88,13 @@ describe("resolveChannelGroupPolicy", () => {
       name: "respects account-scoped allowlist overrides",
       config: { groupPolicy: "open", accounts: { work: { groupPolicy: "allowlist" } } },
       accountId: "work",
+      hasGroupAllowFrom: false,
+      allowed: false,
+    },
+    {
+      name: "keeps the WhatsApp root allowlist when its account reader would miss the key",
+      config: { groupPolicy: "allowlist", accounts: { "ops.team": { groupPolicy: "open" } } },
+      accountId: "ops-team",
       hasGroupAllowFrom: false,
       allowed: false,
     },
