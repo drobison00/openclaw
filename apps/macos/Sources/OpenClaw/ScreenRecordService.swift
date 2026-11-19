@@ -100,7 +100,7 @@ final class ScreenRecordService {
             try await stream.stopCapture()
         } catch {
             if started { try? await stream.stopCapture() }
-            throw error
+            throw PermissionManager.screenCaptureFailure(error)
         }
 
         try await recorder.finish()

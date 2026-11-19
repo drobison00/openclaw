@@ -2,7 +2,6 @@ import CoreLocation
 import Foundation
 import OpenClawIPC
 import OpenClawKit
-import ScreenCaptureKit
 
 @MainActor
 protocol MacNodeRuntimeMainActorServices: Sendable {
@@ -73,15 +72,11 @@ final class LiveMacNodeRuntimeMainActorServices: MacNodeRuntimeMainActorServices
         fps: Double?,
         includeAudio: Bool?) async throws -> (path: String, durationMs: Int, fps: Double, hasAudio: Bool)
     {
-        do {
-            return try await self.screenRecorder.record(
-                screenIndex: screenIndex,
-                durationMs: durationMs,
-                fps: fps,
-                includeAudio: includeAudio)
-        } catch let error as NSError where error.domain == SCStreamErrorDomain {
-            throw PermissionManager.screenCaptureFailure(error)
-        }
+        try await self.screenRecorder.record(
+            screenIndex: screenIndex,
+            durationMs: durationMs,
+            fps: fps,
+            includeAudio: includeAudio)
     }
 
     func locationAuthorizationStatus() -> CLAuthorizationStatus {
