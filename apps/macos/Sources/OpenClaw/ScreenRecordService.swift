@@ -49,7 +49,21 @@ final class ScreenRecordService {
             noDisplays: ScreenRecordError.noDisplays,
             invalidIndex: ScreenRecordError.invalidScreenIndex)
 
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let excludedApplications: [SCRunningApplication]
+        if ApprovalPromptState.shared.isPending {
+            let content = try await SCShareableContent.current
+            excludedApplications = content.applications.filter {
+                $0.processID == ProcessInfo.processInfo.processIdentifier
+            }
+        } else {
+            excludedApplications = []
+        }
+        let excludesApplication = !excludedApplications.isEmpty
+        try ApprovalPromptState.shared.checkScreenCapture(excludesApplication: excludesApplication)
+        let filter = SCContentFilter(
+            display: display,
+            excludingApplications: excludedApplications,
+            exceptingWindows: [])
         let config = SCStreamConfiguration()
         config.width = display.width
         config.height = display.height
@@ -85,6 +99,12 @@ final class ScreenRecordService {
         }
 
         try await recorder.finish()
+        do {
+            try ApprovalPromptState.shared.checkScreenCapture(excludesApplication: excludesApplication)
+        } catch {
+            try FileManager.default.removeItem(at: outURL)
+            throw error
+        }
         return (path: outURL.path, durationMs: durationMs, fps: fps, hasAudio: recorder.hasAudio)
     }
 }
