@@ -10,6 +10,9 @@
     "onStartup": false
   },
   "channels": ["tlon"],
+  "channelAccountKeyPolicies": {
+    "tlon": { "canonicalAliases": "always" }
+  },
   "skills": ["node_modules/@tloncorp/tlon-skill"],
   "configSchema": {
     "type": "object",

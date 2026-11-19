@@ -14,11 +14,6 @@ export type ChannelGroupConfig = Pick<
 
 export type ChannelGroups = Record<string, ChannelGroupConfig>;
 
-// Telegram's account reader also normalizes stored keys when selecting an account.
-export function channelGroupAccountKeyNormalizer(channel: ChannelId) {
-  return channel === "telegram" ? normalizeAccountId : undefined;
-}
-
 export function resolveChannelGroups(
   cfg: OpenClawConfig,
   channel: ChannelId,
@@ -40,7 +35,6 @@ export function resolveChannelGroups(
     channelId: channel,
     accounts: channelConfig.accounts,
     accountId: normalizedAccountId,
-    normalizeAccountId: channelGroupAccountKeyNormalizer(channel),
     inheritEmptyKeys:
       Object.keys(channelConfig.accounts ?? {}).length > 1 ? {} : { groups: "object" },
   }).groups;

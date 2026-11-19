@@ -11,6 +11,9 @@
     "onStartup": false
   },
   "channels": ["telegram"],
+  "channelAccountKeyPolicies": {
+    "telegram": { "canonicalAliases": "always" }
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

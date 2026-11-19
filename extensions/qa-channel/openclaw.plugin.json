@@ -7,6 +7,9 @@
     "onStartup": false
   },
   "channels": ["qa-channel"],
+  "channelAccountKeyPolicies": {
+    "qa-channel": { "canonicalAliases": "always" }
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

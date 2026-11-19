@@ -1,31 +1,6 @@
-import type { OpenClawConfig, TelegramGroupConfig } from "openclaw/plugin-sdk/config-contracts";
+import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { expectDefined } from "openclaw/plugin-sdk/expect-runtime";
-import { normalizeAccountId } from "openclaw/plugin-sdk/routing";
-import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
-
-type TelegramGroups = Record<string, TelegramGroupConfig>;
-
-function resolveAccountGroups(
-  cfg: OpenClawConfig,
-  accountId?: string | null,
-): TelegramGroups | undefined {
-  if (!accountId) {
-    return undefined;
-  }
-  const normalized = normalizeAccountId(accountId);
-  const accounts = cfg.channels?.telegram?.accounts;
-  if (!accounts || typeof accounts !== "object") {
-    return undefined;
-  }
-  const exact = accounts[normalized];
-  if (exact?.groups) {
-    return exact.groups;
-  }
-  const matchKey = Object.keys(accounts).find(
-    (key) => normalizeLowercaseStringOrEmpty(key) === normalizeLowercaseStringOrEmpty(normalized),
-  );
-  return matchKey ? accounts[matchKey]?.groups : undefined;
-}
+import { resolveTelegramAccountConfig } from "./account-config.js";
 
 export function migrateTelegramGroupConfig(params: {
   cfg: OpenClawConfig;
@@ -37,7 +12,9 @@ export function migrateTelegramGroupConfig(params: {
   let skippedExisting = false;
 
   const migrationTargets = [
-    resolveAccountGroups(params.cfg, params.accountId),
+    params.accountId
+      ? resolveTelegramAccountConfig(params.cfg, params.accountId)?.groups
+      : undefined,
     params.cfg.channels?.telegram?.groups,
   ];
 

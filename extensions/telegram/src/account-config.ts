@@ -1,21 +1,23 @@
 import {
   mergeAccountConfig,
   normalizeAccountId,
-  resolveNormalizedAccountEntry,
   type OpenClawConfig,
 } from "openclaw/plugin-sdk/account-core";
+import { resolveAccountKey } from "openclaw/plugin-sdk/account-resolution";
 import type { TelegramAccountConfig } from "openclaw/plugin-sdk/config-contracts";
 
 export function resolveTelegramAccountConfig(
-  cfg: OpenClawConfig,
+  cfg: OpenClawConfig | undefined,
   accountId: string,
 ): TelegramAccountConfig | undefined {
-  const normalized = normalizeAccountId(accountId);
-  return resolveNormalizedAccountEntry(
-    cfg.channels?.telegram?.accounts,
-    normalized,
-    normalizeAccountId,
-  );
+  const accounts = cfg?.channels?.telegram?.accounts;
+  if (!accounts || Array.isArray(accounts)) {
+    return undefined;
+  }
+  const key = resolveAccountKey(accounts, normalizeAccountId(accountId), undefined, undefined, {
+    channelId: "telegram",
+  });
+  return key === undefined ? undefined : accounts[key];
 }
 
 export function mergeTelegramAccountConfig(

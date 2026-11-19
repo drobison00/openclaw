@@ -36,6 +36,36 @@ describe("SDK resolveAccountKey channel context", () => {
     });
   });
 
+  it("ranks exact, case-only, then canonical keys under the selected owner's policy", () => {
+    const canonical = { canonicalAliases: "always" } as const;
+    const aliases = { "Work.Phone": {}, "Work Phone": {} };
+    const select = (entries: Record<string, object>, id: string) =>
+      key(entries, "work-phone", undefined, undefined, { channelId: id });
+    const owner = createPluginMetadataSnapshotFixture({
+      plugins: [
+        {
+          id: "fixture",
+          channels: ["chat", "signal", "telegram"],
+          channelAccountKeyPolicies: {
+            chat: canonical,
+            signal: { canonicalAliasesRequireOwnField: "account" },
+          },
+        },
+      ],
+    });
+    withPluginMetadataSnapshotScope(owner, () => {
+      expect(select(aliases, "chat")).toBe("Work.Phone");
+      const withCase = { ...aliases, "WORK-PHONE": {} };
+      expect(select(withCase, "chat")).toBe("WORK-PHONE");
+      expect(select({ ...withCase, "work-phone": {} }, "chat")).toBe("work-phone");
+      expect(select(aliases, "signal")).toBeUndefined();
+      expect(select({ ...aliases, "Work Phone": { account: "+12025550100" } }, "signal")).toBe(
+        "Work Phone",
+      );
+      expect(select(aliases, "telegram")).toBeUndefined();
+    });
+  });
+
   it("uses channel policy for missing targets and rejects reserved creation through the public entry", () => {
     withPluginMetadataSnapshotScope(snapshot, () => {
       const missing = { ...phone, allowMissing: true };

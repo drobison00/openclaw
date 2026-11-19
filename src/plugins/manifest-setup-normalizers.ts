@@ -91,9 +91,17 @@ export function normalizeChannelAccountKeyPolicies(
       continue;
     }
     const entry = value[channel];
-    const field = isRecord(entry)
-      ? normalizeOptionalString(entry.canonicalAliasesRequireOwnField)
-      : undefined;
+    if (!isRecord(entry)) {
+      continue;
+    }
+    if (
+      entry.canonicalAliases === "always" &&
+      !Object.hasOwn(entry, "canonicalAliasesRequireOwnField")
+    ) {
+      policies[channel] = { canonicalAliases: "always" };
+      continue;
+    }
+    const field = normalizeOptionalString(entry.canonicalAliasesRequireOwnField);
     if (field && !isBlockedObjectKey(field)) {
       policies[channel] = { canonicalAliasesRequireOwnField: field };
     }

@@ -3,7 +3,6 @@ import type { ChannelId } from "../channels/plugins/channel-id.types.js";
 import { resolveChannelAccountEntry, resolveChannelAccountKey } from "../routing/account-lookup.js";
 import { normalizeAccountId } from "../routing/session-key.js";
 import {
-  channelGroupAccountKeyNormalizer,
   resolveChannelGroups,
   type ChannelGroupConfig,
   type ChannelGroups,
@@ -71,12 +70,7 @@ export function resolveChannelGroupsConfigPath(params: {
     return rootPath;
   }
   const accountId = normalizeAccountId(params.accountId);
-  const accountKey = resolveChannelAccountKey(
-    accounts,
-    accountId,
-    params.channel,
-    channelGroupAccountKeyNormalizer(params.channel),
-  );
+  const accountKey = resolveChannelAccountKey(accounts, accountId, params.channel);
   const account = accountKey ? accounts[accountKey] : undefined;
   // Account merging preserves map references. Use the owner's selected map so
   // empty-map inheritance and shallow replacement both retain their exact scope.
@@ -109,7 +103,6 @@ function resolveChannelGroupPolicyMode(
     channelConfig.accounts,
     normalizedAccountId,
     channel,
-    channelGroupAccountKeyNormalizer(channel),
   )?.groupPolicy;
   return accountPolicy ?? channelConfig.groupPolicy;
 }

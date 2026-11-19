@@ -115,6 +115,25 @@ describe("resolveGroupToolPolicy group context validation", () => {
     );
   });
 
+  it("applies the bundled QA account's tools to its routed group session", () => {
+    const tools = { deny: ["write"] };
+    const cfg = {
+      channels: {
+        "qa-channel": {
+          groups: { "*": { tools: { allow: ["write"] } } },
+          accounts: { "Ops.Team": { groups: { room: { tools } } } },
+        },
+      },
+    };
+    expect(
+      resolveGroupToolPolicy({
+        config: cfg,
+        sessionKey: "agent:main:qa-channel:group:room",
+        accountId: "ops-team",
+      }),
+    ).toEqual(tools);
+  });
+
   it("prefers the topic policy over the base group for a topic-sender session", () => {
     // Feishu reports parents narrowest first; the first matching policy wins.
     sessionConversation.parents["oc_team:topic:om_42:sender:ou_alice"] = {

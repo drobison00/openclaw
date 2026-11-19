@@ -3,6 +3,7 @@ import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
 } from "@openclaw/normalization-core/string-coerce";
+import { BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS } from "../channels/bundled-channel-ids.generated.js";
 import { isBlockedObjectKey } from "../infra/prototype-keys.js";
 import { snapshotReaderSlot } from "../plugins/plugin-metadata-snapshot-readers.js";
 import {
@@ -10,9 +11,33 @@ import {
   normalizeOptionalAccountId,
 } from "./account-id.js";
 
-export type ChannelAccountKeyPolicy = {
-  canonicalAliasesRequireOwnField: string;
-};
+export type ChannelAccountKeyPolicy =
+  | { canonicalAliasesRequireOwnField: string; canonicalAliases?: never }
+  | { canonicalAliases: "always"; canonicalAliasesRequireOwnField?: never };
+
+function acceptsCanonicalAlias(policy: ChannelAccountKeyPolicy, value: unknown): boolean {
+  if (policy.canonicalAliases === "always") {
+    return true;
+  }
+  const field = policy.canonicalAliasesRequireOwnField;
+  const entry = asOptionalRecord(value);
+  return Boolean(entry && Object.hasOwn(entry, field) && normalizeOptionalString(entry[field]));
+}
+
+function channelAccountKeyPolicy(channelId: string): ChannelAccountKeyPolicy | undefined {
+  const snapshot = snapshotReaderSlot.getCurrentPluginMetadataSnapshot?.({
+    allowScopedSnapshot: true,
+    allowWorkspaceScopedSnapshot: true,
+  });
+  if (snapshot) {
+    return snapshot.owners.channelAccountKeyPolicies?.get(channelId);
+  }
+  // Direct SDK calls have no owner snapshot. Use the bundled manifest declarations
+  // for unconditional matching without discovering plugins or changing field-gated lookups.
+  return BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS.includes(channelId)
+    ? { canonicalAliases: "always" }
+    : undefined;
+}
 
 /** Uses the prepared channel owner policy; discovery and account state stay outside lookup. */
 export function resolveChannelAccountKey<T>(
@@ -93,15 +118,7 @@ export function resolveAccountKey<T>(
   options?: { allowMissing?: boolean; channelId?: string },
 ): string | undefined {
   const effectivePolicy =
-    policy ??
-    (options?.channelId
-      ? snapshotReaderSlot
-          .getCurrentPluginMetadataSnapshot?.({
-            allowScopedSnapshot: true,
-            allowWorkspaceScopedSnapshot: true,
-          })
-          ?.owners.channelAccountKeyPolicies?.get(options.channelId)
-      : undefined);
+    policy ?? (options?.channelId ? channelAccountKeyPolicy(options.channelId) : undefined);
   const normalizer = effectivePolicy ? normalizeRoutingAccountId : normalizeAccountId;
   const normalize = normalizer ?? normalizeLowercaseStringOrEmpty;
   if (
@@ -140,13 +157,7 @@ export function resolveAccountKey<T>(
       if (!effectivePolicy) {
         return key;
       }
-      const entry = asOptionalRecord(accounts[key]);
-      if (
-        canonicalMatch === undefined &&
-        entry &&
-        Object.hasOwn(entry, effectivePolicy.canonicalAliasesRequireOwnField) &&
-        normalizeOptionalString(entry[effectivePolicy.canonicalAliasesRequireOwnField])
-      ) {
+      if (canonicalMatch === undefined && acceptsCanonicalAlias(effectivePolicy, accounts[key])) {
         canonicalMatch = key;
       }
     }

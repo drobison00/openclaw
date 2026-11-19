@@ -8,6 +8,12 @@ type BundledChannelIdMetadata = {
   label?: string;
 };
 
+export const BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS: readonly string[] = [
+  "qa-channel",
+  "telegram",
+  "tlon",
+];
+
 export const GENERATED_BUNDLED_CHANNEL_IDS: readonly BundledChannelIdMetadata[] = [
   {
     channelId: "a2a",

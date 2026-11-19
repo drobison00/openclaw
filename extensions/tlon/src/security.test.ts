@@ -64,32 +64,48 @@ it.each([
   }
 });
 
-it.each([false, true])("admits thread follow-up with explicit mention: %s", async (explicit) => {
-  const { mentionDecision } = await prepareTlonGroupAdmission({
-    cfg: explicit
-      ? { channels: { tlon: { implicitMentions: { threadParticipation: false } } } }
-      : {},
-    account: { accountId: "default" },
-    api: { scry: async () => ({}) },
-    channelNest: "chat/~host/general",
-    senderShip: "~nec",
-    isOwner: () => false,
-    botShipName: "~zod",
-    botNickname: null,
-    messageContent: [{ inline: [explicit ? "~zod follow up" : "follow up"] }],
-    messageSeal: { "parent-id": "1234" },
-    isThreadReply: true,
-    hasParticipatedInThread: (parentId) => parentId === "1234",
-    getSettings: () => ({}),
-    runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
-  });
-  expect(mentionDecision).toMatchObject({
-    shouldSkip: false,
-    ...(explicit
-      ? { effectiveWasMentioned: true }
-      : { matchedImplicitMentionKinds: ["bot_thread_participant"] }),
-  });
-});
+it.each([
+  { explicit: false, accountId: "default", shouldSkip: false },
+  { explicit: true, accountId: "default", shouldSkip: false },
+  { explicit: false, accountId: "ops-team", shouldSkip: true },
+])(
+  "checks thread participation for $accountId (explicit mention: $explicit)",
+  async ({ explicit, accountId, shouldSkip }) => {
+    const { senderAllowed, mentionDecision } = await prepareTlonGroupAdmission({
+      cfg: {
+        channels: {
+          tlon: {
+            defaultAuthorizedShips: ["~nec"],
+            ...(explicit ? { implicitMentions: { threadParticipation: false } } : {}),
+            accounts: { "Ops.Team": { implicitMentions: { threadParticipation: false } } },
+          },
+        },
+      },
+      account: { accountId },
+      api: { scry: async () => ({}) },
+      channelNest: "chat/~host/general",
+      senderShip: "~nec",
+      isOwner: () => false,
+      botShipName: "~zod",
+      botNickname: null,
+      messageContent: [{ inline: [explicit ? "~zod follow up" : "follow up"] }],
+      messageSeal: { "parent-id": "1234" },
+      isThreadReply: true,
+      hasParticipatedInThread: (parentId) => parentId === "1234",
+      getSettings: () => ({}),
+      runtime: { log: vi.fn(), error: vi.fn(), exit: vi.fn() },
+    });
+    expect(senderAllowed).toBe(true);
+    expect(mentionDecision).toMatchObject({
+      shouldSkip,
+      ...(shouldSkip
+        ? {}
+        : explicit
+          ? { effectiveWasMentioned: true }
+          : { matchedImplicitMentionKinds: ["bot_thread_participant"] }),
+    });
+  },
+);
 
 it.each([
   [{ sect: null }, "@all"],

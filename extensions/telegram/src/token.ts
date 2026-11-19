@@ -1,11 +1,6 @@
-import { resolveNormalizedAccountEntry } from "openclaw/plugin-sdk/account-core";
 import type { BaseTokenResolution } from "openclaw/plugin-sdk/channel-contract";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
-import {
-  DEFAULT_ACCOUNT_ID,
-  normalizeAccountId,
-  normalizeOptionalAccountId,
-} from "openclaw/plugin-sdk/routing";
+import { DEFAULT_ACCOUNT_ID, normalizeOptionalAccountId } from "openclaw/plugin-sdk/routing";
 import { tryReadSecretFileSync } from "openclaw/plugin-sdk/secret-file-runtime";
 import {
   normalizeSecretInputString,
@@ -13,6 +8,7 @@ import {
 } from "openclaw/plugin-sdk/secret-input";
 import { canResolveEnvSecretRefInReadOnlyPath } from "openclaw/plugin-sdk/secret-ref-readonly";
 import { asNonArrayRecord } from "openclaw/plugin-sdk/string-coerce-runtime";
+import { resolveTelegramAccountConfig } from "./account-config.js";
 import { resolveDefaultTelegramAccountId } from "./account-selection.js";
 
 type CredentialUnavailableDiagnostic = Extract<
@@ -128,11 +124,7 @@ export function resolveTelegramToken(
     requestedAccountId ?? (cfg ? resolveDefaultTelegramAccountId(cfg) : DEFAULT_ACCOUNT_ID);
   const telegramCfg = cfg?.channels?.telegram;
 
-  // Account IDs are normalized for routing (e.g. lowercased). Config keys may not
-  // be normalized, so resolve per-account config by matching normalized IDs.
-  const accountCfg = Array.isArray(telegramCfg?.accounts)
-    ? undefined
-    : resolveNormalizedAccountEntry(telegramCfg?.accounts, accountId, normalizeAccountId);
+  const accountCfg = resolveTelegramAccountConfig(cfg, accountId);
 
   // Unknown accounts may inherit the single-bot token, but must not select
   // another bot's credentials in a multi-bot setup (#53876).
