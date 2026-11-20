@@ -11,7 +11,7 @@
   },
   "channels": ["tlon"],
   "channelAccountKeyPolicies": {
-    "tlon": { "canonicalAliases": "always" }
+    "tlon": { "canonicalAliases": "always", "defaultAccountSource": "channel" }
   },
   "skills": ["node_modules/@tloncorp/tlon-skill"],
   "configSchema": {

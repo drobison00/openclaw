@@ -211,6 +211,7 @@ function buildPluginMetadataOwnerMaps(
     string,
     NonNullable<PluginManifestRecord["channelAccountKeyPolicies"]>[string]
   >();
+  const enabledCanonicalAccountKeyChannels = new Set<string>();
   const selectedChannels = new Set<string>();
   const enabledPluginIds = new Set(
     index.plugins.filter((plugin) => plugin.enabled).map((plugin) => plugin.pluginId),
@@ -231,12 +232,16 @@ function buildPluginMetadataOwnerMaps(
       const policy = owner.channelAccountKeyPolicies?.[channel];
       if (policy) {
         channelAccountKeyPolicies.set(channel, policy);
+        if (policy.canonicalAliases === "always" && enabledPluginIds.has(owner.id)) {
+          enabledCanonicalAccountKeyChannels.add(channel);
+        }
       }
     }
   }
   return {
     ...owners,
     channelAccountKeyPolicies,
+    enabledCanonicalAccountKeyChannels,
     ...buildPluginMetadataProviderFacts(plugins, enabledPluginIds),
   };
 }

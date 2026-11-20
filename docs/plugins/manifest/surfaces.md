@@ -733,6 +733,9 @@ A channel whose account reader accepts every canonical alias can declare
 credentials or have only group settings. Both policies select the exact routing
 id first, then a case-insensitive match, then the first eligible canonical alias
 in stored order. Readers and writers use the same selected stored key.
+For a root-backed default account, an unconditional policy can also declare
+`"defaultAccountSource": "channel"`. Tlon uses this setting so its default ship
+reads channel settings even when a stored account key normalizes to `default`.
 
 For Signal, `Work Phone` resolves as `work-phone` when it has its own `account`
 number. Its settings then apply even if the channel root also has a number.
@@ -742,9 +745,11 @@ manual change. Doctor also reports normalized-key collisions and preserves both
 entries; an exact `work-phone` key wins at runtime.
 
 Rules for undeclared channels are ignored. Runtime reads use the selected plugin
-metadata snapshot. Direct SDK calls without a snapshot also recognize bundled
-channels that declare unconditional canonical aliases, using generated manifest
-metadata. Neither path loads plugin code to find the rule. See
+metadata snapshot. If a projection omits the channel, it can recover an enabled
+owner's unconditional policy from the nearest source view containing the channel.
+Field-gated policies apply only in the selected view. Direct SDK calls without a
+snapshot also recognize bundled channels that declare unconditional canonical
+aliases, using generated manifest metadata. Neither path loads plugin code to find the rule. See
 [account lookup arguments](/plugins/sdk-channel-plugins/setup-and-config#stored-account-key-selection)
 for the SDK contract.
 

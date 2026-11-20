@@ -111,6 +111,10 @@ stored key or `undefined`:
 | `options.channelId`    | Optional channel whose selected manifest supplies the policy. An explicit `policy` takes precedence. Without a channel or selected policy, the normalizer and case-insensitive behavior stay unchanged.                                |
 | `options.allowMissing` | Return the creation target when no stored key is eligible. Reserved object keys throw before a writer can create an unreadable account.                                                                                                |
 
+A channel with `canonicalAliases: "always"` can set `defaultAccountSource: "channel"`
+when its default identity reads settings at the channel root. Account lookups for
+that identity skip the stored account map. Named accounts keep the precedence above.
+
 The shipped v2026.9.4 SDK does not export `resolveAccountKey`; use these options
 only with a host SDK that supplies this selector and channel context. This does
 not change the behavior of the older entry-returning helpers.

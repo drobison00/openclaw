@@ -39,6 +39,7 @@ export type PluginProviderAuthContribution = {
 export type PluginMetadataSnapshotOwnerMaps = {
   channels: ReadonlyMap<string, readonly string[]>;
   channelAccountKeyPolicies?: ReadonlyMap<string, ChannelAccountKeyPolicy>;
+  enabledCanonicalAccountKeyChannels?: ReadonlySet<string>;
   channelConfigs: ReadonlyMap<string, readonly string[]>;
   providers: ReadonlyMap<string, readonly string[]>;
   modelCatalogProviders: ReadonlyMap<string, readonly string[]>;

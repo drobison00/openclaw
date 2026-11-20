@@ -3,17 +3,22 @@ import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
 } from "@openclaw/normalization-core/string-coerce";
-import { BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS } from "../channels/bundled-channel-ids.generated.js";
+import { BUNDLED_CANONICAL_ACCOUNT_KEY_POLICIES } from "../channels/bundled-channel-ids.generated.js";
 import { isBlockedObjectKey } from "../infra/prototype-keys.js";
 import { snapshotReaderSlot } from "../plugins/plugin-metadata-snapshot-readers.js";
 import {
+  DEFAULT_ACCOUNT_ID,
   normalizeAccountId as normalizeRoutingAccountId,
   normalizeOptionalAccountId,
 } from "./account-id.js";
 
 export type ChannelAccountKeyPolicy =
   | { canonicalAliasesRequireOwnField: string; canonicalAliases?: never }
-  | { canonicalAliases: "always"; canonicalAliasesRequireOwnField?: never };
+  | {
+      canonicalAliases: "always";
+      canonicalAliasesRequireOwnField?: never;
+      defaultAccountSource?: "channel";
+    };
 
 function acceptsCanonicalAlias(policy: ChannelAccountKeyPolicy, value: unknown): boolean {
   if (policy.canonicalAliases === "always") {
@@ -25,22 +30,33 @@ function acceptsCanonicalAlias(policy: ChannelAccountKeyPolicy, value: unknown):
 }
 
 function channelAccountKeyPolicy(channelId: string): ChannelAccountKeyPolicy | undefined {
-  let snapshot = snapshotReaderSlot.getCurrentPluginMetadataSnapshot?.({
+  const snapshot = snapshotReaderSlot.getCurrentPluginMetadataSnapshot?.({
     allowScopedSnapshot: true,
     allowWorkspaceScopedSnapshot: true,
   });
-  // A scoped owner can deliberately omit a policy. Only consult the source if
-  // the projection omitted the channel itself.
-  while (snapshot?.pluginIds && !snapshot.owners.channels.has(channelId)) {
-    snapshot = snapshotReaderSlot.getPluginMetadataProjectionSource?.(snapshot);
+  if (!snapshot) {
+    return BUNDLED_CANONICAL_ACCOUNT_KEY_POLICIES.get(channelId);
   }
-  if (snapshot) {
-    return snapshot.owners.channelAccountKeyPolicies?.get(channelId);
+  const scopedPolicy = snapshot.owners.channelAccountKeyPolicies?.get(channelId);
+  if (scopedPolicy || snapshot.owners.channels.has(channelId)) {
+    return scopedPolicy;
   }
-  // Without prepared owner metadata, only bundled unconditional declarations are available.
-  return BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS.includes(channelId)
-    ? { canonicalAliases: "always" }
-    : undefined;
+  // An omitted owner can supply only its enabled, unconditional alias policy.
+  // Stop at the nearest owner, even if its declaration is absent or ineligible.
+  let view = snapshot;
+  while (view.pluginIds) {
+    const source = snapshotReaderSlot.getPluginMetadataProjectionSource?.(view);
+    if (!source) {
+      break;
+    }
+    if (source.owners.channels.has(channelId)) {
+      return source.owners.enabledCanonicalAccountKeyChannels?.has(channelId)
+        ? source.owners.channelAccountKeyPolicies?.get(channelId)
+        : undefined;
+    }
+    view = source;
+  }
+  return undefined;
 }
 
 /** Uses the prepared channel owner policy; discovery and account state stay outside lookup. */
@@ -135,6 +151,13 @@ export function resolveAccountKey<T>(
   const targetId = effectivePolicy ? normalize(accountId) : accountId;
   // Creation uses the owner's target id, never the spelling of a rejected alias.
   const missingKey = options?.allowMissing ? targetId : undefined;
+  if (
+    targetId === DEFAULT_ACCOUNT_ID &&
+    effectivePolicy?.canonicalAliases === "always" &&
+    effectivePolicy.defaultAccountSource === "channel"
+  ) {
+    return missingKey;
+  }
   if (!accounts || typeof accounts !== "object") {
     return missingKey;
   }

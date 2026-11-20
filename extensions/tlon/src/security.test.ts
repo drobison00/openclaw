@@ -1,7 +1,9 @@
+import { resolveChannelConfigWrites } from "openclaw/plugin-sdk/channel-config-writes";
 import { createPluginRuntimeMock } from "openclaw/plugin-sdk/channel-test-helpers";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withChannelAccountKeyScope } from "../../../test/helpers/channel-account-key-scope.js";
+import { TlonConfigSchema } from "./config-schema.js";
 import { resolveChannelAuthorization } from "./monitor/authorization.js";
 import { prepareTlonGroupAdmission } from "./monitor/mentions.js";
 import {
@@ -12,6 +14,7 @@ import {
   extractMessageText,
 } from "./monitor/utils.js";
 import { setTlonRuntime } from "./runtime.js";
+import { resolveTlonAccount } from "./types.js";
 
 beforeEach(() => setTlonRuntime(createPluginRuntimeMock()));
 
@@ -124,6 +127,33 @@ it.each([
     });
   },
 );
+
+it("keeps the root ship's admission and write policy for a default-shaped alias", async () => {
+  const tlon = {
+    ship: "~zod",
+    defaultAuthorizedShips: ["~nec"],
+    implicitMentions,
+    configWrites: false,
+    accounts: {
+      "Default.": {
+        ship: "~bus",
+        implicitMentions: { threadParticipation: true },
+        configWrites: true,
+      },
+    },
+  };
+  expect(TlonConfigSchema.safeParse(tlon).success).toBe(true);
+  const cfg = { channels: { tlon } };
+  const account = resolveTlonAccount(cfg, "default");
+  expect(account.ship).toBe(tlon.ship);
+  const admission = await threadAdmission(cfg, account.accountId, false);
+  expect(admission.senderAllowed).toBe(true);
+  expect(admission.mentionDecision.shouldSkip).toBe(true);
+  expect(admission.isAdmissionAllowed()).toBe(false);
+  expect(resolveChannelConfigWrites({ cfg, channelId: "tlon", accountId: account.accountId })).toBe(
+    false,
+  );
+});
 
 it.each(["direct", "projected"] as const)(
   "honors the named account's thread participation opt-out (%s)",
