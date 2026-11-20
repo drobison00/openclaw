@@ -102,18 +102,19 @@ from the runtime plugin's manifest: another manifest may own the channel policy.
 `resolveAccountKey(accounts, accountId, normalizeAccountId?, policy?, options?)` returns a
 stored key or `undefined`:
 
-| Argument               | Meaning                                                                                                                                                                                                                                |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accounts`             | Authored account map, or `undefined`.                                                                                                                                                                                                  |
-| `accountId`            | Requested account id. With a policy, routing normalization runs first and the exact normalized key wins. Without a policy, the exact requested key wins.                                                                               |
-| `normalizeAccountId`   | Optional function applied to the requested id and stored keys when no policy is supplied. Omit both for case-insensitive lookup. A policy selects routing normalization.                                                               |
-| `policy`               | Optional `ChannelAccountKeyPolicy`. Use `canonicalAliases: "always"` to accept canonical aliases, or `canonicalAliasesRequireOwnField` to require an own nonempty string field. Exact and case-only matches precede canonical aliases. |
-| `options.channelId`    | Optional channel whose selected manifest supplies the policy. An explicit `policy` takes precedence. Without a channel or selected policy, the normalizer and case-insensitive behavior stay unchanged.                                |
-| `options.allowMissing` | Return the creation target when no stored key is eligible. Reserved object keys throw before a writer can create an unreadable account.                                                                                                |
+| Argument               | Meaning                                                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accounts`             | Authored account map, or `undefined`.                                                                                                                                                                   |
+| `accountId`            | Requested account id. With a policy, routing normalization runs first and the exact normalized key wins. Without a policy, the exact requested key wins.                                                |
+| `normalizeAccountId`   | Optional function applied to the requested id and stored keys when no policy is supplied. Omit both for case-insensitive lookup. A policy selects routing normalization.                                |
+| `policy`               | Optional `ChannelAccountKeyPolicy`. Use `canonicalAliases: "always"` for named-account aliases, or `canonicalAliasesRequireOwnField` to require an own nonempty string field.                           |
+| `options.channelId`    | Optional channel whose selected manifest supplies the policy. An explicit `policy` takes precedence. Without a channel or selected policy, the normalizer and case-insensitive behavior stay unchanged. |
+| `options.allowMissing` | Return the creation target when no stored key is eligible. Reserved object keys throw before a writer can create an unreadable account.                                                                 |
 
-A channel with `canonicalAliases: "always"` can set `defaultAccountSource: "channel"`
-when its default identity reads settings at the channel root. Account lookups for
-that identity skip the stored account map. Named accounts keep the precedence above.
+After an exact routing id, `canonicalAliases: "always"` selects the first stored
+key with the same canonical id, including case-only spellings. For `default`,
+the caller's original matching rule applies. With a field gate, case-only matches
+precede the first eligible canonical alias.
 
 The shipped v2026.9.4 SDK does not export `resolveAccountKey`; use these options
 only with a host SDK that supplies this selector and channel context. This does

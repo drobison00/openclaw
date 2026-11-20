@@ -155,6 +155,29 @@ it("keeps the root ship's admission and write policy for a default-shaped alias"
   );
 });
 
+it.each(["default", "DEFAULT"])(
+  "honors admission and write restrictions on accounts.%s",
+  async (key) => {
+    const tlon = {
+      ship: "~zod",
+      defaultAuthorizedShips: ["~nec"],
+      configWrites: true,
+      implicitMentions: { threadParticipation: true },
+      accounts: { [key]: { ship: "~bus", configWrites: false, implicitMentions } },
+    };
+    expect(TlonConfigSchema.safeParse(tlon).success).toBe(true);
+    const cfg = { channels: { tlon } };
+    const account = resolveTlonAccount(cfg, "default");
+    expect(account.ship).toBe(tlon.ship);
+    const admission = await threadAdmission(cfg, account.accountId, false);
+    expect(admission.senderAllowed).toBe(true);
+    expect(admission.isAdmissionAllowed()).toBe(false);
+    expect(
+      resolveChannelConfigWrites({ cfg, channelId: "tlon", accountId: account.accountId }),
+    ).toBe(false);
+  },
+);
+
 it.each(["direct", "projected"] as const)(
   "honors the named account's thread participation opt-out (%s)",
   async (scope) => {

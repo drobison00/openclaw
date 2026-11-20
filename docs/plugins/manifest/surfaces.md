@@ -726,16 +726,15 @@ account config under `channels.<id>.accounts`.
 
 `canonicalAliasesRequireOwnField` is the name of a string field in the account
 entry. An alias that matches only after account-id normalization is eligible when
-that entry has a nonempty value for this field. Root values do not satisfy it.
+that entry has a nonempty value for this field. Root values do not satisfy it. Exact and
+case-only keys take precedence over aliases that require this field.
 
-A channel whose account reader accepts every canonical alias can declare
-`{ "canonicalAliases": "always" }` instead. This includes accounts that inherit
-credentials or have only group settings. Both policies select the exact routing
-id first, then a case-insensitive match, then the first eligible canonical alias
-in stored order. Readers and writers use the same selected stored key.
-For a root-backed default account, an unconditional policy can also declare
-`"defaultAccountSource": "channel"`. Tlon uses this setting so its default ship
-reads channel settings even when a stored account key normalizes to `default`.
+A channel can declare `{ "canonicalAliases": "always" }` for named accounts,
+including those that inherit credentials or have only group settings. The exact
+routing id wins. Otherwise, readers and writers select the first stored key
+that normalizes to that id, including case-only spellings. For the `default`
+routing id, shared policy lookups retain exact and case-insensitive matching.
+Channel readers with an explicit normalizer retain their default-account behavior.
 
 For Signal, `Work Phone` resolves as `work-phone` when it has its own `account`
 number. Its settings then apply even if the channel root also has a number.

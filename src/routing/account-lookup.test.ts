@@ -37,7 +37,7 @@ describe("SDK resolveAccountKey channel context", () => {
     });
   });
 
-  it("ranks exact, case-only, then canonical keys under the selected owner's policy", () => {
+  it("uses stored order for unconditional aliases and honors the selected owner's field gate", () => {
     const canonical = { canonicalAliases: "always" } as const;
     const aliases = { "Work.Phone": {}, "Work Phone": {} };
     const select = (entries: Record<string, object>, id: string) =>
@@ -57,7 +57,7 @@ describe("SDK resolveAccountKey channel context", () => {
     withPluginMetadataSnapshotScope(owner, () => {
       expect(select(aliases, "chat")).toBe("Work.Phone");
       const withCase = { ...aliases, "WORK-PHONE": {} };
-      expect(select(withCase, "chat")).toBe("WORK-PHONE");
+      expect(select(withCase, "chat")).toBe("Work.Phone");
       expect(select({ ...withCase, "work-phone": {} }, "chat")).toBe("work-phone");
       expect(select(aliases, "signal")).toBeUndefined();
       expect(select({ ...aliases, "Work Phone": { account: "+12025550100" } }, "signal")).toBe(

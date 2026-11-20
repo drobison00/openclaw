@@ -8,7 +8,9 @@ import {
 } from "openclaw/plugin-sdk/temp-path";
 import { withEnv } from "openclaw/plugin-sdk/test-env";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { withChannelAccountKeyScope } from "../../../test/helpers/channel-account-key-scope.js";
 import { telegramSetupPlugin } from "../setup-plugin-api.js";
+import { resolveTelegramAccountConfig } from "./account-config.js";
 import { inspectTelegramAccount } from "./account-inspect.js";
 import { prepareTelegramFinalDeliveryConfig } from "./final-delivery-config.js";
 import { resolveTelegramBotUserIdFromToken } from "./token-fingerprint.js";
@@ -77,6 +79,24 @@ it("pins the admitted final-delivery credential across rotation with colliding a
   const prepared = prepareTelegramFinalDeliveryConfig(cfg, accountId, admitted);
   fs.writeFileSync(tokenFile, "789:after");
   expect(resolveTelegramToken(prepared, { accountId }).token).toBe(admitted);
+});
+
+describe.each(["restored", "invalidated"] as const)("%s projection", (scope) => {
+  it.each([
+    ["Default.", "default"],
+    ["Night.Shift", "night-shift"],
+  ])("keeps the credential and pins it on %s", (key, accountId) => {
+    const entry = { tokenFile: createTokenFile("admitted.txt", "123:admitted") };
+    const cfg = telegramConfig({ botToken: "456:root", accounts: { [key]: entry } });
+    withChannelAccountKeyScope(scope, "telegram", () => {
+      expect(resolveTelegramAccountConfig(cfg, accountId)).toBe(entry);
+      expect(resolveTelegramToken(cfg, { accountId }).token).toBe("123:admitted");
+      const pinned = prepareTelegramFinalDeliveryConfig(cfg, accountId, "123:admitted");
+      fs.writeFileSync(entry.tokenFile, "789:rotated");
+      expect(Object.keys(pinned.channels?.telegram?.accounts ?? {})).toEqual([key]);
+      expect(resolveTelegramToken(pinned, { accountId }).token).toBe("123:admitted");
+    });
+  });
 });
 
 it.each([

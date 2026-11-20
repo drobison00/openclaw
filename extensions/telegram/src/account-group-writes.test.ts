@@ -1,4 +1,10 @@
 import { resolveChannelConfigWrites } from "openclaw/plugin-sdk/channel-config-helpers";
+import {
+  resolveChannelGroupPolicy,
+  resolveChannelGroupRequireMention,
+  resolveChannelGroups,
+  resolveChannelGroupsConfigPath,
+} from "openclaw/plugin-sdk/channel-policy";
 import { describe, expect, it } from "vitest";
 import { withChannelAccountKeyScope } from "../../../test/helpers/channel-account-key-scope.js";
 import { resolveTelegramAccountConfig } from "./account-config.js";
@@ -81,10 +87,31 @@ describe.each(["direct", "projected"] as const)("%s account writes", (scope) => 
   });
 });
 
-it("selects the case-only account before a dotted alias for settings and credentials", () => {
-  const alias = { botToken: "alias-token" };
-  const winner = { botToken: "case-token" };
-  const cfg = { channels: { telegram: { accounts: { "Ops.Team": alias, "OPS-TEAM": winner } } } };
-  expect(resolveTelegramAccountConfig(cfg, accountId)).toBe(winner);
-  expect(resolveTelegramToken(cfg, { accountId }).token).toBe(winner.botToken);
+it("uses the first canonical alias for settings, credentials and group policy", () => {
+  const first = {
+    botToken: "alias-token",
+    configWrites: false,
+    groupPolicy: "allowlist" as const,
+    groups: { [groupId]: { requireMention: true, tools } },
+  };
+  const second = {
+    botToken: "case-token",
+    configWrites: true,
+    groupPolicy: "disabled" as const,
+    groups: { [groupId]: { requireMention: false, tools: { allow: ["write"] } } },
+  };
+  const cfg = { channels: { telegram: { accounts: { "Ops.Team": first, "OPS-TEAM": second } } } };
+  const selected = resolveTelegramAccountConfig(cfg, accountId);
+  expect(selected).toBe(first);
+  expect(resolveTelegramToken(cfg, { accountId }).token).toBe(first.botToken);
+  const params = { cfg, channel: "telegram", groupId, accountId } as const;
+  const groups = resolveChannelGroups(cfg, params.channel, accountId);
+  expect(groups).toBe(selected?.groups);
+  expect(resolveChannelGroupsConfigPath({ ...params, groups })).toBe(
+    'channels.telegram.accounts["Ops.Team"].groups',
+  );
+  expect(resolveChannelGroupPolicy(params).allowed).toBe(true);
+  expect(resolveChannelGroupRequireMention(params)).toBe(true);
+  expect(resolveTelegramGroupToolPolicy(params)).toEqual(first.groups[groupId].tools);
+  expect(resolveChannelConfigWrites({ cfg, channelId: params.channel, accountId })).toBe(false);
 });

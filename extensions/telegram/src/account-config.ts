@@ -13,9 +13,7 @@ export function resolveTelegramAccountConfigKey(
   if (!accounts || Array.isArray(accounts)) {
     return undefined;
   }
-  return resolveAccountKey(accounts, normalizeAccountId(accountId), undefined, undefined, {
-    channelId: "telegram",
-  });
+  return resolveAccountKey(accounts, normalizeAccountId(accountId), normalizeAccountId);
 }
 
 export function resolveTelegramAccountConfig(

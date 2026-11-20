@@ -3,7 +3,7 @@ import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
 } from "@openclaw/normalization-core/string-coerce";
-import { BUNDLED_CANONICAL_ACCOUNT_KEY_POLICIES } from "../channels/bundled-channel-ids.generated.js";
+import { BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS } from "../channels/bundled-channel-ids.generated.js";
 import { isBlockedObjectKey } from "../infra/prototype-keys.js";
 import { snapshotReaderSlot } from "../plugins/plugin-metadata-snapshot-readers.js";
 import {
@@ -14,17 +14,9 @@ import {
 
 export type ChannelAccountKeyPolicy =
   | { canonicalAliasesRequireOwnField: string; canonicalAliases?: never }
-  | {
-      canonicalAliases: "always";
-      canonicalAliasesRequireOwnField?: never;
-      defaultAccountSource?: "channel";
-    };
+  | { canonicalAliases: "always"; canonicalAliasesRequireOwnField?: never };
 
-function acceptsCanonicalAlias(policy: ChannelAccountKeyPolicy, value: unknown): boolean {
-  if (policy.canonicalAliases === "always") {
-    return true;
-  }
-  const field = policy.canonicalAliasesRequireOwnField;
+function hasOwnAliasField(value: unknown, field: string): boolean {
   const entry = asOptionalRecord(value);
   return Boolean(entry && Object.hasOwn(entry, field) && normalizeOptionalString(entry[field]));
 }
@@ -35,7 +27,9 @@ function channelAccountKeyPolicy(channelId: string): ChannelAccountKeyPolicy | u
     allowWorkspaceScopedSnapshot: true,
   });
   if (!snapshot) {
-    return BUNDLED_CANONICAL_ACCOUNT_KEY_POLICIES.get(channelId);
+    return BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS.includes(channelId)
+      ? { canonicalAliases: "always" }
+      : undefined;
   }
   const scopedPolicy = snapshot.owners.channelAccountKeyPolicies?.get(channelId);
   if (scopedPolicy || snapshot.owners.channels.has(channelId)) {
@@ -139,7 +133,13 @@ export function resolveAccountKey<T>(
 ): string | undefined {
   const effectivePolicy =
     policy ?? (options?.channelId ? channelAccountKeyPolicy(options.channelId) : undefined);
-  const normalizer = effectivePolicy ? normalizeRoutingAccountId : normalizeAccountId;
+  const targetId = effectivePolicy ? normalizeRoutingAccountId(accountId) : accountId;
+  const requiredField = effectivePolicy?.canonicalAliasesRequireOwnField;
+  // For the default account, keep the caller's original matching rule.
+  const normalizer =
+    effectivePolicy && (requiredField !== undefined || targetId !== DEFAULT_ACCOUNT_ID)
+      ? normalizeRoutingAccountId
+      : normalizeAccountId;
   const normalize = normalizer ?? normalizeLowercaseStringOrEmpty;
   if (
     options?.allowMissing &&
@@ -148,16 +148,8 @@ export function resolveAccountKey<T>(
   ) {
     throw new Error(`Account id "${accountId}" is reserved. Choose a different account id.`);
   }
-  const targetId = effectivePolicy ? normalize(accountId) : accountId;
   // Creation uses the owner's target id, never the spelling of a rejected alias.
   const missingKey = options?.allowMissing ? targetId : undefined;
-  if (
-    targetId === DEFAULT_ACCOUNT_ID &&
-    effectivePolicy?.canonicalAliases === "always" &&
-    effectivePolicy.defaultAccountSource === "channel"
-  ) {
-    return missingKey;
-  }
   if (!accounts || typeof accounts !== "object") {
     return missingKey;
   }
@@ -171,8 +163,8 @@ export function resolveAccountKey<T>(
     if (normalizer && isBlockedObjectKey(key)) {
       continue;
     }
-    // Existing case-only matches retain precedence over newly reachable aliases.
-    if (effectivePolicy && normalizeLowercaseStringOrEmpty(key) === lowercaseTarget) {
+    // Only field-gated policies give case-only matches priority over earlier aliases.
+    if (requiredField !== undefined && normalizeLowercaseStringOrEmpty(key) === lowercaseTarget) {
       return key;
     }
     const candidate = normalize(key);
@@ -181,10 +173,10 @@ export function resolveAccountKey<T>(
         (Boolean(normalizeOptionalAccountId(key)) && !isBlockedObjectKey(candidate))) &&
       candidate === normalized
     ) {
-      if (!effectivePolicy) {
+      if (requiredField === undefined) {
         return key;
       }
-      if (canonicalMatch === undefined && acceptsCanonicalAlias(effectivePolicy, accounts[key])) {
+      if (canonicalMatch === undefined && hasOwnAliasField(accounts[key], requiredField)) {
         canonicalMatch = key;
       }
     }

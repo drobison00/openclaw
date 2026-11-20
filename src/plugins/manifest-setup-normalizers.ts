@@ -98,10 +98,7 @@ export function normalizeChannelAccountKeyPolicies(
       entry.canonicalAliases === "always" &&
       !Object.hasOwn(entry, "canonicalAliasesRequireOwnField")
     ) {
-      policies[channel] = {
-        canonicalAliases: "always",
-        ...(entry.defaultAccountSource === "channel" ? { defaultAccountSource: "channel" } : {}),
-      };
+      policies[channel] = { canonicalAliases: "always" };
       continue;
     }
     const field = normalizeOptionalString(entry.canonicalAliasesRequireOwnField);
