@@ -25,15 +25,19 @@ function acceptsCanonicalAlias(policy: ChannelAccountKeyPolicy, value: unknown):
 }
 
 function channelAccountKeyPolicy(channelId: string): ChannelAccountKeyPolicy | undefined {
-  const snapshot = snapshotReaderSlot.getCurrentPluginMetadataSnapshot?.({
+  let snapshot = snapshotReaderSlot.getCurrentPluginMetadataSnapshot?.({
     allowScopedSnapshot: true,
     allowWorkspaceScopedSnapshot: true,
   });
+  // A scoped owner can deliberately omit a policy. Only consult the source if
+  // the projection omitted the channel itself.
+  while (snapshot?.pluginIds && !snapshot.owners.channels.has(channelId)) {
+    snapshot = snapshotReaderSlot.getPluginMetadataProjectionSource?.(snapshot);
+  }
   if (snapshot) {
     return snapshot.owners.channelAccountKeyPolicies?.get(channelId);
   }
-  // Direct SDK calls have no owner snapshot. Use the bundled manifest declarations
-  // for unconditional matching without discovering plugins or changing field-gated lookups.
+  // Without prepared owner metadata, only bundled unconditional declarations are available.
   return BUNDLED_CANONICAL_ACCOUNT_KEY_CHANNELS.includes(channelId)
     ? { canonicalAliases: "always" }
     : undefined;

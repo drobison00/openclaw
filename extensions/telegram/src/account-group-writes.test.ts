@@ -1,5 +1,6 @@
 import { resolveChannelConfigWrites } from "openclaw/plugin-sdk/channel-config-helpers";
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { withChannelAccountKeyScope } from "../../../test/helpers/channel-account-key-scope.js";
 import { resolveTelegramAccountConfig } from "./account-config.js";
 import { telegramPlugin } from "./channel.js";
 import { migrateTelegramGroupConfig } from "./group-migration.js";
@@ -27,41 +28,57 @@ function telegramConfig(configWrites = true) {
   };
 }
 
-it("edits the sender list on the account that supplied the group deny", async () => {
-  const cfg = telegramConfig();
-  const parsedConfig = structuredClone(cfg);
-  const result = await telegramPlugin.allowlist?.applyConfigEdit?.({
-    cfg,
-    parsedConfig,
-    accountId,
-    scope: "group",
-    action: "add",
-    entry: "202",
+describe.each(["direct", "projected"] as const)("%s account writes", (scope) => {
+  it("edits the sender list on the account that supplied the group deny", async () => {
+    const cfg = telegramConfig();
+    const parsedConfig = structuredClone(cfg);
+    const result = await withChannelAccountKeyScope(scope, "telegram", () =>
+      telegramPlugin.allowlist?.applyConfigEdit?.({
+        cfg,
+        parsedConfig,
+        accountId,
+        scope: "group",
+        action: "add",
+        entry: "202",
+      }),
+    );
+    expect(result).toMatchObject({ kind: "ok", changed: true });
+    expect(resolveTelegramGroupToolPolicy({ cfg: parsedConfig, groupId, accountId })).toEqual(
+      tools,
+    );
+    expect(Object.keys(parsedConfig.channels.telegram.accounts)).toEqual(["Ops.Team"]);
+    expect(parsedConfig.channels.telegram.accounts["Ops.Team"].groupAllowFrom).toEqual([
+      "101",
+      "202",
+    ]);
   });
-  expect(result).toMatchObject({ kind: "ok", changed: true });
-  expect(resolveTelegramGroupToolPolicy({ cfg: parsedConfig, groupId, accountId })).toEqual(tools);
-  expect(Object.keys(parsedConfig.channels.telegram.accounts)).toEqual(["Ops.Team"]);
-  expect(parsedConfig.channels.telegram.accounts["Ops.Team"].groupAllowFrom).toEqual([
-    "101",
-    "202",
-  ]);
-});
 
-it("carries the account's group deny to the migrated chat id", () => {
-  const cfg = telegramConfig();
-  const newChatId = "-100123";
-  expect(migrateTelegramGroupConfig({ cfg, accountId, oldChatId: groupId, newChatId })).toEqual({
-    migrated: true,
-    skippedExisting: false,
+  it("carries the account's group deny to the migrated chat id", () => {
+    const cfg = telegramConfig();
+    const newChatId = "-100123";
+    expect(
+      withChannelAccountKeyScope(scope, "telegram", () =>
+        migrateTelegramGroupConfig({ cfg, accountId, oldChatId: groupId, newChatId }),
+      ),
+    ).toEqual({
+      migrated: true,
+      skippedExisting: false,
+    });
+    expect(resolveTelegramGroupToolPolicy({ cfg, accountId, groupId: newChatId })).toEqual(tools);
+    expect(cfg.channels.telegram.accounts["Ops.Team"].groups).not.toHaveProperty(groupId);
   });
-  expect(resolveTelegramGroupToolPolicy({ cfg, accountId, groupId: newChatId })).toEqual(tools);
-  expect(cfg.channels.telegram.accounts["Ops.Team"].groups).not.toHaveProperty(groupId);
-});
 
-it("checks migration permission on the authored account", () => {
-  expect(
-    resolveChannelConfigWrites({ cfg: telegramConfig(false), channelId: "telegram", accountId }),
-  ).toBe(false);
+  it("checks migration permission on the authored account", () => {
+    expect(
+      withChannelAccountKeyScope(scope, "telegram", () =>
+        resolveChannelConfigWrites({
+          cfg: telegramConfig(false),
+          channelId: "telegram",
+          accountId,
+        }),
+      ),
+    ).toBe(false);
+  });
 });
 
 it("selects the case-only account before a dotted alias for settings and credentials", () => {

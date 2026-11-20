@@ -7,7 +7,9 @@ export type CurrentSnapshotModule = Pick<
 >;
 export type SnapshotLoaderModule = Pick<
   typeof import("./plugin-metadata-snapshot.js"),
-  "resolvePluginMetadataSnapshot" | "loadPluginMetadataSnapshot"
+  | "resolvePluginMetadataSnapshot"
+  | "loadPluginMetadataSnapshot"
+  | "getPluginMetadataProjectionSource"
 >;
 export type MetadataPolicyReaders = Pick<
   typeof import("./manifest-metadata-scan.js"),
@@ -26,6 +28,7 @@ const readerLifetime = resolveGlobalSingleton(
 const readerKeys = [
   "adoptCurrentPluginMetadataSnapshotIfAbsent",
   "getCurrentPluginMetadataSnapshot",
+  "getPluginMetadataProjectionSource",
   "resolvePluginMetadataSnapshot",
   "loadPluginMetadataSnapshot",
   "listOpenClawPluginManifestMetadata",

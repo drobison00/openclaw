@@ -1,7 +1,8 @@
 import { normalizeAccountId } from "openclaw/plugin-sdk/account-id";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { PlatformMessageNotDispatchedError } from "openclaw/plugin-sdk/error-runtime";
-import { resolveTelegramAccount, resolveTelegramAccountConfig } from "./accounts.js";
+import { resolveTelegramAccountConfigKey } from "./account-config.js";
+import { resolveTelegramAccount } from "./accounts.js";
 
 /** Preserve the inbound bot, including credentials resolved outside the config snapshot. */
 export function prepareTelegramFinalDeliveryConfig(
@@ -25,12 +26,7 @@ export function prepareTelegramFinalDeliveryConfig(
   }
   const telegram = cfg.channels?.telegram;
   const accounts = telegram?.accounts;
-  const key =
-    accounts && Object.hasOwn(accounts, account.accountId)
-      ? account.accountId
-      : (Object.keys(accounts ?? {}).find(
-          (candidateKey) => normalizeAccountId(candidateKey) === account.accountId,
-        ) ?? account.accountId);
+  const key = resolveTelegramAccountConfigKey(accounts, account.accountId);
   // Resolve once, then pin that exact credential for every part of this send.
   // A token file or environment change during async preparation cannot select another bot.
   return {
@@ -41,8 +37,8 @@ export function prepareTelegramFinalDeliveryConfig(
         ...telegram,
         accounts: {
           ...accounts,
-          [key]: {
-            ...resolveTelegramAccountConfig(cfg, account.accountId),
+          [key ?? account.accountId]: {
+            ...(key === undefined ? undefined : accounts?.[key]),
             tokenFile: undefined,
             botToken: token,
           },

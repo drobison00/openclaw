@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { withChannelAccountKeyScope } from "../../test/helpers/channel-account-key-scope.js";
 import type { OpenClawConfig } from "../config/config.js";
 import { replaceSessionEntry } from "../config/sessions/session-accessor.js";
 import type { SessionEntry } from "../config/sessions/types.js";
@@ -115,24 +116,29 @@ describe("resolveGroupToolPolicy group context validation", () => {
     );
   });
 
-  it("applies the bundled QA account's tools to its routed group session", () => {
-    const tools = { deny: ["write"] };
-    const cfg = {
-      channels: {
-        "qa-channel": {
-          groups: { "*": { tools: { allow: ["write"] } } },
-          accounts: { "Ops.Team": { groups: { room: { tools } } } },
+  it.each(["direct", "projected"] as const)(
+    "applies the bundled QA account's tools to its routed group session (%s)",
+    (scope) => {
+      const tools = { deny: ["write"] };
+      const cfg = {
+        channels: {
+          "qa-channel": {
+            groups: { "*": { tools: { allow: ["write"] } } },
+            accounts: { "Ops.Team": { groups: { room: { tools } } } },
+          },
         },
-      },
-    };
-    expect(
-      resolveGroupToolPolicy({
-        config: cfg,
-        sessionKey: "agent:main:qa-channel:group:room",
-        accountId: "ops-team",
-      }),
-    ).toEqual(tools);
-  });
+      };
+      expect(
+        withChannelAccountKeyScope(scope, "qa-channel", () =>
+          resolveGroupToolPolicy({
+            config: cfg,
+            sessionKey: "agent:main:qa-channel:group:room",
+            accountId: "ops-team",
+          }),
+        ),
+      ).toEqual(tools);
+    },
+  );
 
   it("prefers the topic policy over the base group for a topic-sender session", () => {
     // Feishu reports parents narrowest first; the first matching policy wins.

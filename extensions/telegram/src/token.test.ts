@@ -10,6 +10,7 @@ import { withEnv } from "openclaw/plugin-sdk/test-env";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { telegramSetupPlugin } from "../setup-plugin-api.js";
 import { inspectTelegramAccount } from "./account-inspect.js";
+import { prepareTelegramFinalDeliveryConfig } from "./final-delivery-config.js";
 import { resolveTelegramBotUserIdFromToken } from "./token-fingerprint.js";
 import { resolveTelegramToken } from "./token.js";
 import * as tokenRuntime from "./token.js";
@@ -62,6 +63,21 @@ function telegramConfig(
 ): OpenClawConfig {
   return { channels: { telegram }, ...(secrets ? { secrets } : {}) };
 }
+
+it("pins the admitted final-delivery credential across rotation with colliding account keys", () => {
+  const accountId = "ops-team";
+  const tokenFile = createTokenFile("case-token.txt", "123:before");
+  const cfg = telegramConfig({
+    accounts: {
+      "Ops.Team": { botToken: "456:literal" },
+      "OPS-TEAM": { tokenFile },
+    },
+  });
+  const admitted = resolveTelegramToken(cfg, { accountId }).token;
+  const prepared = prepareTelegramFinalDeliveryConfig(cfg, accountId, admitted);
+  fs.writeFileSync(tokenFile, "789:after");
+  expect(resolveTelegramToken(prepared, { accountId }).token).toBe(admitted);
+});
 
 it.each([
   { accountId: "work", configured: false },

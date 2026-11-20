@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveAccountKey as key } from "../plugin-sdk/account-resolution.js";
 import { withPluginMetadataSnapshotScope } from "../plugins/current-plugin-metadata-snapshot.js";
+import { projectPluginMetadataSnapshot } from "../plugins/plugin-metadata-snapshot.js";
 import { createPluginMetadataSnapshotFixture } from "../plugins/plugin-metadata.test-support.js";
 import { normalizeAccountId as normalizeRoutingAccountId } from "./account-id.js";
 import { resolveAccountEntry, resolveNormalizedAccountEntry } from "./account-lookup.js";
@@ -64,6 +65,34 @@ describe("SDK resolveAccountKey channel context", () => {
       );
       expect(select(aliases, "telegram")).toBeUndefined();
     });
+  });
+
+  it("recovers omitted owners while honoring a scoped owner's missing declaration", () => {
+    const full = createPluginMetadataSnapshotFixture({
+      plugins: [
+        {
+          id: "declaring",
+          channels: ["telegram", "external"],
+          channelAccountKeyPolicies: {
+            telegram: { canonicalAliases: "always" },
+            external: { canonicalAliases: "always" },
+          },
+        },
+        { id: "replacement", channels: ["telegram"] },
+      ],
+    });
+    const replacement = projectPluginMetadataSnapshot(full, ["replacement"]);
+    const empty = projectPluginMetadataSnapshot(replacement, []);
+    for (const view of [replacement, empty]) {
+      withPluginMetadataSnapshotScope(view, () => {
+        expect(key(accounts, "work-phone", undefined, undefined, { channelId: "external" })).toBe(
+          "Work Phone",
+        );
+        expect(
+          key(accounts, "work-phone", undefined, undefined, { channelId: "telegram" }),
+        ).toBeUndefined();
+      });
+    }
   });
 
   it("uses channel policy for missing targets and rejects reserved creation through the public entry", () => {

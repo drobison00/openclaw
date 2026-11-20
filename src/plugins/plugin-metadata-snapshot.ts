@@ -299,6 +299,12 @@ export function rebasePluginMetadataSnapshotManifestRegistry(
   return rebased;
 }
 
+export function getPluginMetadataProjectionSource(
+  snapshot: PluginMetadataSnapshot,
+): PluginMetadataSnapshot | undefined {
+  return getPluginMetadataSnapshotCache(snapshot).metadata.projectionSources.get(snapshot);
+}
+
 export function projectPluginMetadataSnapshot(
   snapshot: PluginMetadataSnapshot,
   pluginIds: readonly string[] | undefined,
@@ -471,7 +477,7 @@ export function completePluginMetadataSnapshot(params: {
   if (cached) {
     return cached;
   }
-  const source = cache.metadata.projectionSources.get(snapshot);
+  const source = getPluginMetadataProjectionSource(snapshot);
   if (source) {
     const completed = completePluginMetadataSnapshot({ ...params, snapshot: source });
     if (completed) {
@@ -671,6 +677,7 @@ export function buildPluginMetadataSnapshot(
 // instance whenever the metadata system is loaded; the require fallback only
 // covers cold processes.
 registerPluginMetadataSnapshotReaders({
+  getPluginMetadataProjectionSource,
   resolvePluginMetadataSnapshot,
   loadPluginMetadataSnapshot,
 });

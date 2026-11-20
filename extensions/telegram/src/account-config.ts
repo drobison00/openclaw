@@ -6,18 +6,25 @@ import {
 import { resolveAccountKey } from "openclaw/plugin-sdk/account-resolution";
 import type { TelegramAccountConfig } from "openclaw/plugin-sdk/config-contracts";
 
+export function resolveTelegramAccountConfigKey(
+  accounts: Record<string, TelegramAccountConfig> | undefined,
+  accountId: string,
+): string | undefined {
+  if (!accounts || Array.isArray(accounts)) {
+    return undefined;
+  }
+  return resolveAccountKey(accounts, normalizeAccountId(accountId), undefined, undefined, {
+    channelId: "telegram",
+  });
+}
+
 export function resolveTelegramAccountConfig(
   cfg: OpenClawConfig | undefined,
   accountId: string,
 ): TelegramAccountConfig | undefined {
   const accounts = cfg?.channels?.telegram?.accounts;
-  if (!accounts || Array.isArray(accounts)) {
-    return undefined;
-  }
-  const key = resolveAccountKey(accounts, normalizeAccountId(accountId), undefined, undefined, {
-    channelId: "telegram",
-  });
-  return key === undefined ? undefined : accounts[key];
+  const key = resolveTelegramAccountConfigKey(accounts, accountId);
+  return key === undefined ? undefined : accounts?.[key];
 }
 
 export function mergeTelegramAccountConfig(
