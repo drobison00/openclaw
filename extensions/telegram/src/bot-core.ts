@@ -1,3 +1,4 @@
+import { normalizeAccountId } from "openclaw/plugin-sdk/account-core";
 import {
   buildChannelGroupsScopeTree,
   resolveChannelGroupPolicy,
@@ -259,6 +260,7 @@ export async function createTelegramBotCore(
   const logger = getChildLogger({ module: "telegram-auto-reply" });
   const resolveGroupPolicy = (chatId: string | number, turnCfg: OpenClawConfig) =>
     resolveChannelGroupPolicy({
+      normalizeAccountKey: normalizeAccountId,
       cfg: turnCfg,
       channel: "telegram",
       accountId: account.accountId,
@@ -291,7 +293,7 @@ export async function createTelegramBotCore(
   };
   const resolveGroupRequireMention = (chatId: string | number, turnCfg: OpenClawConfig) =>
     resolveScopeRequireMention({
-      tree: buildChannelGroupsScopeTree(turnCfg, "telegram", account.accountId),
+      tree: buildChannelGroupsScopeTree(turnCfg, "telegram", account.accountId, normalizeAccountId),
       path: [String(chatId)],
       requireMentionOverride: opts.requireMention,
       overrideOrder: "after-config",

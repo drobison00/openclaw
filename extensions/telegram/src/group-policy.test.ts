@@ -1,6 +1,9 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { describe, expect, it } from "vitest";
-import { resolveTelegramGroupRequireMention } from "./group-policy.js";
+import {
+  resolveTelegramGroupToolPolicy,
+  resolveTelegramGroupRequireMention,
+} from "./group-policy.js";
 
 describe("resolveTelegramGroupRequireMention", () => {
   const cfg = {
@@ -32,5 +35,19 @@ describe("resolveTelegramGroupRequireMention", () => {
         accountId: "work",
       }),
     ).toBe(true);
+  });
+});
+
+it.each(["ops.team", "Ops Team", "ops-team"])("uses the group tool deny stored under %s", (key) => {
+  const cfg: OpenClawConfig = {
+    channels: {
+      telegram: {
+        groups: { "*": { tools: { allow: ["read"] } } },
+        accounts: { [key]: { groups: { "-1001": { tools: { deny: ["read"] } } } } },
+      },
+    },
+  };
+  expect(resolveTelegramGroupToolPolicy({ cfg, accountId: "ops-team", groupId: "-1001" })).toEqual({
+    deny: ["read"],
   });
 });

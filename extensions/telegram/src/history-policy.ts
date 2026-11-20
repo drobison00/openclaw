@@ -1,4 +1,5 @@
 import type { Message } from "grammy/types";
+import { normalizeAccountId } from "openclaw/plugin-sdk/account-core";
 import { firstDefined } from "openclaw/plugin-sdk/allow-from";
 import { resolveChannelGroupPolicy } from "openclaw/plugin-sdk/channel-policy";
 import { hasControlCommand } from "openclaw/plugin-sdk/command-detection";
@@ -152,6 +153,7 @@ export async function isTelegramHistorySenderAllowed(
     senderId,
     resolveGroupPolicy: (chatId, currentCfg) =>
       resolveChannelGroupPolicy({
+        normalizeAccountKey: normalizeAccountId,
         cfg: currentCfg,
         channel: "telegram",
         accountId: params.accountId,

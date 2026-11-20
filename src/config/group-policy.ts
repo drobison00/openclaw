@@ -1,9 +1,8 @@
 import { normalizeLowercaseStringOrEmpty } from "@openclaw/normalization-core/string-coerce";
 import type { ChannelId } from "../channels/plugins/channel-id.types.js";
-import { resolveChannelAccountEntry, resolveChannelAccountKey } from "../routing/account-lookup.js";
-import { normalizeAccountId } from "../routing/session-key.js";
 import {
   resolveChannelGroups,
+  resolveGroupAccountKey,
   type ChannelGroupConfig,
   type ChannelGroups,
 } from "./channel-groups.js";
@@ -58,6 +57,7 @@ export function resolveChannelGroupsConfigPath(params: {
   cfg: OpenClawConfig;
   channel: ChannelId;
   accountId?: string | null;
+  normalizeAccountKey?: (key: string) => string;
   groups: Readonly<Record<string, unknown>> | undefined;
 }): string {
   const rootPath = `channels.${params.channel}.groups`;
@@ -69,8 +69,12 @@ export function resolveChannelGroupsConfigPath(params: {
   if (!accounts) {
     return rootPath;
   }
-  const accountId = normalizeAccountId(params.accountId);
-  const accountKey = resolveChannelAccountKey(accounts, accountId, params.channel);
+  const accountKey = resolveGroupAccountKey(
+    accounts,
+    params.channel,
+    params.accountId,
+    params.normalizeAccountKey,
+  );
   const account = accountKey ? accounts[accountKey] : undefined;
   // Account merging preserves map references. Use the owner's selected map so
   // empty-map inheritance and shallow replacement both retain their exact scope.
@@ -88,8 +92,8 @@ function resolveChannelGroupPolicyMode(
   cfg: OpenClawConfig,
   channel: ChannelId,
   accountId?: string | null,
+  normalizeAccountKey?: (key: string) => string,
 ): ChannelGroupPolicyMode | undefined {
-  const normalizedAccountId = normalizeAccountId(accountId);
   const channelConfig = cfg.channels?.[channel] as
     | {
         groupPolicy?: ChannelGroupPolicyMode;
@@ -99,11 +103,13 @@ function resolveChannelGroupPolicyMode(
   if (!channelConfig) {
     return undefined;
   }
-  const accountPolicy = resolveChannelAccountEntry(
+  const key = resolveGroupAccountKey(
     channelConfig.accounts,
-    normalizedAccountId,
     channel,
-  )?.groupPolicy;
+    accountId,
+    normalizeAccountKey,
+  );
+  const accountPolicy = key === undefined ? undefined : channelConfig.accounts?.[key]?.groupPolicy;
   return accountPolicy ?? channelConfig.groupPolicy;
 }
 
@@ -112,13 +118,19 @@ export function resolveChannelGroupPolicy(params: {
   channel: ChannelId;
   groupId?: string | null;
   accountId?: string | null;
+  normalizeAccountKey?: (key: string) => string;
   groupIdCaseInsensitive?: boolean;
   /** When true, sender-level filtering (groupAllowFrom) is configured upstream. */
   hasGroupAllowFrom?: boolean;
 }): ChannelGroupPolicy {
   const { cfg, channel } = params;
-  const groups = resolveChannelGroups(cfg, channel, params.accountId);
-  const groupPolicy = resolveChannelGroupPolicyMode(cfg, channel, params.accountId);
+  const groups = resolveChannelGroups(cfg, channel, params.accountId, params.normalizeAccountKey);
+  const groupPolicy = resolveChannelGroupPolicyMode(
+    cfg,
+    channel,
+    params.accountId,
+    params.normalizeAccountKey,
+  );
   const hasGroups = Boolean(groups && Object.keys(groups).length > 0);
   const allowlistEnabled = groupPolicy === "allowlist" || hasGroups;
   const normalizedId = params.groupId?.trim();
@@ -168,6 +180,7 @@ export function resolveChannelGroupRequireMention(params: {
   channel: ChannelId;
   groupId?: string | null;
   accountId?: string | null;
+  normalizeAccountKey?: (key: string) => string;
   groupIdCaseInsensitive?: boolean;
   requireMentionOverride?: boolean;
   configuredGroupDefaultsToNoMention?: boolean;
@@ -189,10 +202,16 @@ export function resolveChannelGroupToolsPolicy(
     groupId?: string | null;
     groupIdCandidates?: Array<string | null | undefined>;
     accountId?: string | null;
+    normalizeAccountKey?: (key: string) => string;
     groupIdCaseInsensitive?: boolean;
   } & GroupToolPolicySender,
 ): GroupToolPolicyConfig | undefined {
-  const groups = resolveChannelGroups(params.cfg, params.channel, params.accountId);
+  const groups = resolveChannelGroups(
+    params.cfg,
+    params.channel,
+    params.accountId,
+    params.normalizeAccountKey,
+  );
   const groupIds = [
     params.groupId,
     ...(Array.isArray(params.groupIdCandidates) ? params.groupIdCandidates : []),

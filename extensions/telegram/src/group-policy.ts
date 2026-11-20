@@ -1,3 +1,4 @@
+import { normalizeAccountId } from "openclaw/plugin-sdk/account-core";
 import type { ChannelGroupContext } from "openclaw/plugin-sdk/channel-contract";
 import {
   buildChannelGroupsScopeTree,
@@ -60,6 +61,7 @@ export function resolveTelegramGroupRequireMention(
     }
   }
   return resolveChannelGroupRequireMention({
+    normalizeAccountKey: normalizeAccountId,
     cfg: params.cfg,
     channel: "telegram",
     groupId: chatId ?? params.groupId,
@@ -73,7 +75,7 @@ export function resolveTelegramGroupToolPolicy(
   const { chatId } = parseTelegramGroupId(params.groupId);
   const groupId = chatId ?? params.groupId?.trim();
   return resolveScopeToolsPolicy({
-    tree: buildChannelGroupsScopeTree(params.cfg, "telegram", params.accountId),
+    tree: buildChannelGroupsScopeTree(params.cfg, "telegram", params.accountId, normalizeAccountId),
     path: groupId ? [groupId] : [],
     senderPolicyMode: params.senderPolicyMode,
     senderId: params.senderId,
@@ -83,3 +85,9 @@ export function resolveTelegramGroupToolPolicy(
     messageProvider: "telegram",
   });
 }
+
+export const telegramGroupAdapter = {
+  normalizeAccountKey: normalizeAccountId,
+  resolveRequireMention: resolveTelegramGroupRequireMention,
+  resolveToolPolicy: resolveTelegramGroupToolPolicy,
+};

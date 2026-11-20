@@ -77,10 +77,7 @@ import {
 import { telegramDoctor } from "./doctor.js";
 import { buildTelegramExecApprovalPendingPayload } from "./exec-approval-forwarding.js";
 import { shouldSuppressLocalTelegramExecApprovalPrompt } from "./exec-approvals.js";
-import {
-  resolveTelegramGroupRequireMention,
-  resolveTelegramGroupToolPolicy,
-} from "./group-policy.js";
+import { telegramGroupAdapter } from "./group-policy.js";
 import * as monitorModule from "./monitor.js";
 import { looksLikeTelegramTargetId, normalizeTelegramMessagingTarget } from "./normalize.js";
 import { createTelegramOutboundAdapter, resolveTelegramSend } from "./outbound-adapter.js";
@@ -361,10 +358,7 @@ export const telegramPlugin = createChatChannelPlugin({
       },
       ...telegramThreadBindingSupport,
     },
-    groups: {
-      resolveRequireMention: resolveTelegramGroupRequireMention,
-      resolveToolPolicy: resolveTelegramGroupToolPolicy,
-    },
+    groups: telegramGroupAdapter,
     agentPrompt: telegramAgentPrompt,
     messaging: {
       defaultMarkdownTableMode: "block",

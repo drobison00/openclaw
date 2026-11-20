@@ -6,6 +6,7 @@ import { replaceSessionEntry } from "../config/sessions/session-accessor.js";
 import type { SessionEntry } from "../config/sessions/types.js";
 import type { WhatsAppConfig } from "../config/types.whatsapp.js";
 import { createWarnLogCapture } from "../logging/test-helpers/warn-log-capture.js";
+import { normalizeAccountId } from "../routing/account-id.js";
 import {
   resolveEffectiveToolPolicy,
   resolveGroupToolPolicy,
@@ -28,7 +29,8 @@ vi.mock("../channels/plugins/session-conversation.js", () => ({
   }),
 }));
 vi.mock("../channels/plugins/index.js", () => ({
-  getLoadedChannelPlugin: () => ({
+  getLoadedChannelPlugin: (channel: string) => ({
+    groups: channel === "telegram" ? { normalizeAccountKey: normalizeAccountId } : undefined,
     config: {
       listAccountIds: (config: OpenClawConfig) => [
         "default",
@@ -113,6 +115,23 @@ describe("resolveGroupToolPolicy group context validation", () => {
     expect(groupPolicy({ sessionKey: `agent:main:${session}`, groupId, spawnedBy })).toEqual(
       allow ? { allow } : undefined,
     );
+  });
+
+  it("keeps the channel's account scope when the group has no tool override", () => {
+    expect(
+      resolveGroupToolPolicy({
+        config: {
+          channels: {
+            telegram: {
+              groups: { "*": { tools: { allow: ["exec"] } } },
+              accounts: { "Ops Team": { groups: { "-1001": {} } } },
+            },
+          },
+        },
+        sessionKey: "agent:main:telegram:group:-1001",
+        accountId: "ops-team",
+      }),
+    ).toBeUndefined();
   });
 
   it("prefers the topic policy over the base group for a topic-sender session", () => {

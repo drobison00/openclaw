@@ -33,10 +33,11 @@ export function buildChannelGroupsScopeTree(
   cfg: OpenClawConfig,
   channel: ChannelId,
   accountId?: string | null,
+  normalizeAccountKey?: (key: string) => string,
 ): ScopeTree {
   // 13+ channels share the flat `groups` config shape; richer channels such as
   // Discord, Telegram, and Microsoft Teams ship their own builders.
-  const groups = resolveChannelGroups(cfg, channel, accountId) ?? {};
+  const groups = resolveChannelGroups(cfg, channel, accountId, normalizeAccountKey) ?? {};
   // The wildcard config is the fallback node, not a matchable exact scope.
   const { "*": defaults, ...scopes } = groups;
   return { defaults, scopes };

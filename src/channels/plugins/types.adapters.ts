@@ -148,6 +148,8 @@ export type ChannelSecretsAdapter = {
 };
 
 export type ChannelGroupAdapter = {
+  /** Recover a unique named account alias in shared group policy lookups. */
+  normalizeAccountKey?: (key: string) => string;
   resolveRequireMention?: (params: ChannelGroupContext) => boolean | undefined;
   resolveToolPolicy?: (params: ChannelGroupContext) => GroupToolPolicyConfig | undefined;
 };

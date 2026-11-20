@@ -573,6 +573,7 @@ export function resolveGroupToolPolicy(params: {
     }
   }
   const configTools = resolveChannelGroupToolsPolicy({
+    normalizeAccountKey: plugin?.groups?.normalizeAccountKey,
     cfg: params.config,
     channel,
     messageProvider: channel,

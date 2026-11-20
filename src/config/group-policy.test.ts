@@ -1,5 +1,6 @@
 // Verifies group-policy normalization and runtime resolution.
 import { describe, expect, it } from "vitest";
+import { normalizeAccountId } from "../routing/account-id.js";
 import { parseConcreteConfigPath } from "../shared/dot-path.js";
 import { resolveMergedAccountConfig } from "./channel-account-config.js";
 import { setConfigValueAtPath } from "./config-paths.js";
@@ -7,10 +8,109 @@ import type { OpenClawConfig } from "./config.js";
 import {
   resolveChannelGroupPolicy,
   resolveChannelGroupRequireMention,
+  resolveChannelGroupToolsPolicy,
   resolveChannelGroups,
   resolveChannelGroupsConfigPath,
   resolveToolsBySender,
 } from "./group-policy.js";
+
+describe("named group account aliases", () => {
+  function inspectGroupPolicy(
+    keys: string[],
+    accountId: string,
+    channel: "telegram" | "whatsapp",
+    normalizeAccountKey?: (key: string) => string,
+  ) {
+    const accounts = Object.fromEntries(
+      keys.map((key) => [
+        key,
+        {
+          groupPolicy: "allowlist",
+          groups: { "-1001": { requireMention: true, tools: { deny: [key] } } },
+        },
+      ]),
+    );
+    const cfg: OpenClawConfig = {
+      channels: {
+        [channel]: {
+          groupPolicy: "open",
+          groups: { "*": { requireMention: false, tools: { allow: ["read"] } } },
+          accounts,
+        },
+      },
+    };
+    const params = { cfg, channel, accountId, normalizeAccountKey, groupId: "-1001" };
+    const groups = resolveChannelGroups(cfg, channel, accountId, normalizeAccountKey);
+    const policy = resolveChannelGroupPolicy(params);
+    return {
+      listed: Boolean(policy.groupConfig),
+      unlistedAllowed: resolveChannelGroupPolicy({ ...params, groupId: "-1002" }).allowed,
+      mention: resolveChannelGroupRequireMention(params),
+      tools: resolveChannelGroupToolsPolicy(params),
+      path: resolveChannelGroupsConfigPath({ ...params, groups }),
+    };
+  }
+
+  it.each([
+    { keys: ["ops.team"], selected: "ops.team" },
+    { keys: ["Ops Team"], selected: "Ops Team" },
+    { keys: ["ops-team"], selected: "ops-team" },
+    { keys: ["OPS-TEAM"], selected: "OPS-TEAM" },
+    { keys: ["ops.team", "ops-team"], selected: "ops-team" },
+    { keys: ["ops.team", "OPS-TEAM"], selected: "OPS-TEAM" },
+    { keys: ["OPS-TEAM", "ops.team"], selected: "OPS-TEAM" },
+    { keys: ["ops.team", "Ops Team"], selected: undefined },
+    { keys: ["Ops Team", "ops.team"], selected: undefined },
+    { keys: ["Default."], selected: undefined, accountId: "default" },
+    { keys: ["Default.", "DEFAULT"], selected: "DEFAULT", accountId: "default" },
+    { keys: ["Default.", "DEFAULT", "default"], selected: "default", accountId: "default" },
+  ])("selects $selected for $keys", ({ keys, selected, accountId }) => {
+    expect(
+      inspectGroupPolicy(keys, accountId ?? "ops-team", "telegram", normalizeAccountId),
+    ).toEqual({
+      listed: Boolean(selected),
+      unlistedAllowed: !selected,
+      mention: Boolean(selected),
+      tools: selected ? { deny: [selected] } : { allow: ["read"] },
+      path: selected
+        ? `channels.telegram.accounts["${selected}"].groups`
+        : "channels.telegram.groups",
+    });
+  });
+
+  it("enforces the account allowlist mode even without a groups map", () => {
+    const cfg: OpenClawConfig = {
+      channels: {
+        telegram: {
+          groupPolicy: "open",
+          accounts: { "Ops Team": { groupPolicy: "allowlist" } },
+        },
+      },
+    };
+    expect(
+      resolveChannelGroupPolicy({
+        cfg,
+        channel: "telegram",
+        accountId: "ops-team",
+        normalizeAccountKey: normalizeAccountId,
+        groupId: "-1002",
+      }),
+    ).toMatchObject({ allowlistEnabled: true, allowed: false });
+  });
+
+  it.each(["telegram", "whatsapp"] as const)(
+    "keeps the root for %s without an account normalizer",
+    (channel) => {
+      expect(inspectGroupPolicy(["ops.team"], "ops-team", channel)).toEqual({
+        listed: false,
+        unlistedAllowed: true,
+        mention: false,
+        tools: { allow: ["read"] },
+        path: `channels.${channel}.groups`,
+      });
+    },
+  );
+});
 
 describe("resolveChannelGroupPolicy", () => {
   const whatsapp = (config: Record<string, unknown>) =>
