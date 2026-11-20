@@ -1,21 +1,25 @@
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { expectDefined } from "openclaw/plugin-sdk/expect-runtime";
-import { resolveTelegramAccountConfig } from "./account-config.js";
+import { resolveTelegramAccountConfigKey } from "./account-config.js";
 
-export function migrateTelegramGroupConfig(params: {
-  cfg: OpenClawConfig;
-  accountId?: string | null;
-  oldChatId: string;
-  newChatId: string;
-}) {
+export function migrateTelegramGroupConfig(
+  params: ({ accountKey: string | undefined } | { accountId?: string | null }) & {
+    cfg: OpenClawConfig;
+    oldChatId: string;
+    newChatId: string;
+  },
+) {
   let migrated = false;
   let skippedExisting = false;
 
+  const channel = params.cfg.channels?.telegram;
+  const accountKey =
+    "accountKey" in params
+      ? params.accountKey
+      : params.accountId && resolveTelegramAccountConfigKey(channel?.accounts, params.accountId);
   const migrationTargets = [
-    params.accountId
-      ? resolveTelegramAccountConfig(params.cfg, params.accountId)?.groups
-      : undefined,
-    params.cfg.channels?.telegram?.groups,
+    accountKey ? channel?.accounts?.[accountKey]?.groups : undefined,
+    channel?.groups,
   ];
 
   const { oldChatId, newChatId } = params;

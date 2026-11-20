@@ -105,15 +105,16 @@ stored key or `undefined`:
 | Argument               | Meaning                                                                                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `accounts`             | Authored account map, or `undefined`.                                                                                                                                                                   |
-| `accountId`            | Requested account id. With a policy, routing normalization runs first and the exact normalized key wins. Without a policy, the exact requested key wins.                                                |
-| `normalizeAccountId`   | Optional function applied to the requested id and stored keys when no policy is supplied. Omit both for case-insensitive lookup. A policy selects routing normalization.                                |
+| `accountId`            | Requested account id. The exact requested key wins. A field-gated policy uses the exact normalized routing id first.                                                                                    |
+| `normalizeAccountId`   | Optional matching rule for the requested id and stored keys. A field-gated policy supplies its own routing normalizer.                                                                                  |
 | `policy`               | Optional `ChannelAccountKeyPolicy`. Use `canonicalAliases: "always"` for named-account aliases, or `canonicalAliasesRequireOwnField` to require an own nonempty string field.                           |
 | `options.channelId`    | Optional channel whose selected manifest supplies the policy. An explicit `policy` takes precedence. Without a channel or selected policy, the normalizer and case-insensitive behavior stay unchanged. |
 | `options.allowMissing` | Return the creation target when no stored key is eligible. Reserved object keys throw before a writer can create an unreadable account.                                                                 |
 
-After an exact routing id, `canonicalAliases: "always"` selects the first stored
-key with the same canonical id, including case-only spellings. For `default`,
-the caller's original matching rule applies. With a field gate, case-only matches
+With `canonicalAliases: "always"` and no caller-supplied normalizer, lookup tries
+the exact requested key first. For a named alias it then tries the canonical key,
+followed by the first stored key with the same canonical id. A request that
+normalizes to `default` keeps the usual case-insensitive fallback. With a field gate, case-only matches
 precede the first eligible canonical alias.
 
 The shipped v2026.9.4 SDK does not export `resolveAccountKey`; use these options

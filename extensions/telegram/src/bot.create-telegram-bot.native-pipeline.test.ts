@@ -303,6 +303,36 @@ it("inherits named-account group access and composes exact-topic overrides on wi
   expect(harness.replySpy.mock.calls.at(-1)?.[1]?.skillFilter).toEqual([]);
 });
 
+it.each([false, true])(
+  "skips a write-disabled default migration with a competing DEFAULT row=%s",
+  async (withCaseOnlyRow) => {
+    const groups = { "-61": { tools: { deny: ["marker"] } } };
+    const telegram = {
+      configWrites: true,
+      groups: { "*": { tools: { allow: ["marker"] } } },
+      accounts: {
+        "Default.": { configWrites: false, groups },
+        ...(withCaseOnlyRow ? { DEFAULT: { configWrites: true } } : {}),
+      },
+    };
+    const persist = vi.spyOn(configMutation, "mutateConfigFile").mockResolvedValue({} as never);
+    try {
+      const bot = await configuredBot(telegram, {}, false, "default");
+      await handleMessage(bot, 2300, {
+        message_id: 1,
+        date: 1736380800,
+        chat: { id: -61, type: "group", title: "Old group" },
+        migrate_to_chat_id: -62,
+        from,
+      });
+      expect(persist).not.toHaveBeenCalled();
+      expect(groups).toEqual({ "-61": { tools: { deny: ["marker"] } } });
+    } finally {
+      persist.mockRestore();
+    }
+  },
+);
+
 it("handles the overlapping migration filter once without starting an ordinary turn", async () => {
   const config: OpenClawConfig = {
     channels: {

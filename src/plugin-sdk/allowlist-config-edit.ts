@@ -4,7 +4,7 @@ import type { ChannelAllowlistAdapter } from "../channels/plugins/types.adapters
 import type { ChannelId } from "../channels/plugins/types.public.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isBlockedObjectKey } from "../infra/prototype-keys.js";
-import { resolveChannelAccountKey } from "../routing/account-lookup.js";
+import { resolveAccountKey, resolveChannelAccountKeyPolicy } from "../routing/account-lookup.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/session-key.js";
 import { readObjectPath } from "../shared/dot-path.js";
 import { isRecord } from "../utils.js";
@@ -188,8 +188,12 @@ function resolveAccountScopedWriteTarget(
   // Once an accounts map exists, even the default account writes through it so scoped
   // and unscoped config do not diverge inside the same channel stanza.
   const accounts = (channel.accounts ??= {}) as Record<string, unknown>;
+  const policy = resolveChannelAccountKeyPolicy(channelId);
+  // Named allowlist edits follow declared aliases. Other edits retain literal key matching.
+  const useAliases =
+    policy?.canonicalAliases === "always" && normalizedAccountId !== DEFAULT_ACCOUNT_ID;
   const accountKey =
-    resolveChannelAccountKey(accounts, normalizedAccountId, channelId, (id) => id) ??
+    resolveAccountKey(accounts, normalizedAccountId, useAliases ? undefined : (id) => id, policy) ??
     normalizedAccountId;
   const existingAccount = accounts[accountKey];
   if (!existingAccount || typeof existingAccount !== "object") {

@@ -21,6 +21,17 @@ function writerFixture(declared: boolean) {
 }
 
 describe("public account config writers", () => {
+  it.each(["constructor", ".", "DEFAULT", "Roster."])(
+    "keeps existing accounts when deleting a missing literal key %s",
+    (accountId) => {
+      const accounts = { default: { enabled: true }, roster: { enabled: true } };
+      const cfg = { channels: { telegram: { accounts } } };
+      expect(deleteAccountFromConfigSection({ cfg, sectionKey: "telegram", accountId })).toEqual(
+        cfg,
+      );
+    },
+  );
+
   it.each([false, true])("enable honors account policy=%s", (declared) => {
     const { accounts, params } = writerFixture(declared);
     expect(

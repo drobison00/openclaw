@@ -43,6 +43,17 @@ it("keeps the global prefix for a configured custom channel", () => {
   expect(resolveResponsePrefix(cfg, "main", { channel: "custom" })).toBe("[Bot] ");
 });
 
+it("uses the literal account key for the Telegram response prefix", () => {
+  const accounts = {
+    DEFAULT: { responsePrefix: "uppercase" },
+    default: { responsePrefix: "lowercase" },
+  };
+  const cfg = { channels: { telegram: { accounts } } };
+  expect(resolveResponsePrefix(cfg, "main", { channel: "telegram", accountId: "DEFAULT" })).toBe(
+    "uppercase",
+  );
+});
+
 it("resolves account auto-prefix to the identity name", () => {
   const cfg = prefixConfig(undefined, { business: { responsePrefix: "auto" } });
   expect(resolveResponsePrefix(cfg, "main", { channel: "whatsapp", accountId: "business" })).toBe(

@@ -4,12 +4,12 @@ import type {
   ReactionTypeCustomEmoji,
   ReactionTypeEmoji,
 } from "grammy/types";
-import { resolveChannelConfigWrites } from "openclaw/plugin-sdk/channel-config-helpers";
 import { reportChannelRoomJoin } from "openclaw/plugin-sdk/channel-join-intro-runtime";
 import { mutateConfigFile } from "openclaw/plugin-sdk/config-mutation";
 import { readRuntimeConfig as getRuntimeConfig } from "openclaw/plugin-sdk/runtime-config-snapshot";
 import { danger, logVerbose, warn } from "openclaw/plugin-sdk/runtime-env";
 import { enqueueRoutedSystemEvent } from "openclaw/plugin-sdk/system-event-runtime";
+import { resolveTelegramAccountConfigKey } from "./account-config.js";
 import { resolveTelegramAccount } from "./accounts.js";
 import { normalizeAllowFrom } from "./bot-access.js";
 import type { TelegramHandlerAuthorization } from "./bot-handlers.inbound-authorization.js";
@@ -474,30 +474,28 @@ export function createTelegramEventBindings({
           warn(`[telegram] Group migrated: "${chatTitle}" ${oldChatId} → ${newChatId}`),
         );
 
-        if (!resolveChannelConfigWrites({ cfg, channelId: "telegram", accountId })) {
+        const channel = cfg.channels?.telegram;
+        const accountKey = resolveTelegramAccountConfigKey(channel?.accounts, accountId);
+        const account = accountKey === undefined ? undefined : channel?.accounts?.[accountKey];
+        if ((account?.configWrites ?? channel?.configWrites) === false) {
           runtime.log?.(
             warn("[telegram] Config writes disabled; skipping group config migration."),
           );
           return;
         }
 
-        const currentConfig = getRuntimeConfig();
-        const migration = migrateTelegramGroupConfig({
-          cfg: currentConfig,
-          accountId,
-          oldChatId,
-          newChatId,
-        });
+        const target = { accountKey, oldChatId, newChatId };
+        const migration = migrateTelegramGroupConfig({ cfg: getRuntimeConfig(), ...target });
 
         if (migration.migrated) {
           runtime.log?.(
             warn(`[telegram] Migrating group config from ${oldChatId} to ${newChatId}`),
           );
-          migrateTelegramGroupConfig({ cfg, accountId, oldChatId, newChatId });
+          migrateTelegramGroupConfig({ cfg, ...target });
           await mutateConfigFile({
             afterWrite: { mode: "auto" },
             mutate: (draft) => {
-              migrateTelegramGroupConfig({ cfg: draft, accountId, oldChatId, newChatId });
+              migrateTelegramGroupConfig({ cfg: draft, ...target });
             },
           });
           runtime.log?.(warn("[telegram] Group config migrated and saved successfully"));

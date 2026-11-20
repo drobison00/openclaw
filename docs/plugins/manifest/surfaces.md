@@ -730,11 +730,11 @@ that entry has a nonempty value for this field. Root values do not satisfy it. E
 case-only keys take precedence over aliases that require this field.
 
 A channel can declare `{ "canonicalAliases": "always" }` for named accounts,
-including those that inherit credentials or have only group settings. The exact
-routing id wins. Otherwise, readers and writers select the first stored key
-that normalizes to that id, including case-only spellings. For the `default`
-routing id, shared policy lookups retain exact and case-insensitive matching.
-Channel readers with an explicit normalizer retain their default-account behavior.
+including those that inherit credentials or have only group settings. Shared lookups
+try the exact requested key first. For a named alias they then try the canonical
+key, followed by the first stored key that normalizes to that id. Shared lookups
+for the default id retain exact and case-insensitive matching. Callers that
+supply their own normalizer keep their matching rule for every id.
 
 For Signal, `Work Phone` resolves as `work-phone` when it has its own `account`
 number. Its settings then apply even if the channel root also has a number.

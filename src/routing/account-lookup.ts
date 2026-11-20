@@ -21,7 +21,9 @@ function hasOwnAliasField(value: unknown, field: string): boolean {
   return Boolean(entry && Object.hasOwn(entry, field) && normalizeOptionalString(entry[field]));
 }
 
-function channelAccountKeyPolicy(channelId: string): ChannelAccountKeyPolicy | undefined {
+export function resolveChannelAccountKeyPolicy(
+  channelId: string,
+): ChannelAccountKeyPolicy | undefined {
   const snapshot = snapshotReaderSlot.getCurrentPluginMetadataSnapshot?.({
     allowScopedSnapshot: true,
     allowWorkspaceScopedSnapshot: true,
@@ -132,34 +134,46 @@ export function resolveAccountKey<T>(
   options?: { allowMissing?: boolean; channelId?: string },
 ): string | undefined {
   const effectivePolicy =
-    policy ?? (options?.channelId ? channelAccountKeyPolicy(options.channelId) : undefined);
-  const targetId = effectivePolicy ? normalizeRoutingAccountId(accountId) : accountId;
+    policy ?? (options?.channelId ? resolveChannelAccountKeyPolicy(options.channelId) : undefined);
   const requiredField = effectivePolicy?.canonicalAliasesRequireOwnField;
-  // For the default account, keep the caller's original matching rule.
-  const normalizer =
-    effectivePolicy && (requiredField !== undefined || targetId !== DEFAULT_ACCOUNT_ID)
-      ? normalizeRoutingAccountId
-      : normalizeAccountId;
-  const normalize = normalizer ?? normalizeLowercaseStringOrEmpty;
+  // Field-gated owners retain their existing canonical target and field check.
+  let normalizer = requiredField === undefined ? normalizeAccountId : normalizeRoutingAccountId;
+  let targetId = requiredField === undefined ? accountId : normalizeRoutingAccountId(accountId);
   if (
     options?.allowMissing &&
     (isBlockedObjectKey(normalizeLowercaseStringOrEmpty(accountId)) ||
-      isBlockedObjectKey(normalize(accountId)))
+      (normalizer && isBlockedObjectKey(normalizer(accountId))))
   ) {
     throw new Error(`Account id "${accountId}" is reserved. Choose a different account id.`);
   }
-  // Creation uses the owner's target id, never the spelling of a rejected alias.
-  const missingKey = options?.allowMissing ? targetId : undefined;
-  if (!accounts || typeof accounts !== "object") {
-    return missingKey;
-  }
-  if (Object.hasOwn(accounts, targetId) && (!normalizer || !isBlockedObjectKey(targetId))) {
+  const entries = accounts && typeof accounts === "object" ? accounts : undefined;
+  if (
+    entries &&
+    Object.hasOwn(entries, targetId) &&
+    (!normalizer || !isBlockedObjectKey(targetId))
+  ) {
     return targetId;
   }
+  if (effectivePolicy?.canonicalAliases === "always" && !normalizeAccountId) {
+    const namedId = normalizeOptionalAccountId(accountId);
+    if (namedId && namedId !== DEFAULT_ACCOUNT_ID) {
+      if (entries && Object.hasOwn(entries, namedId)) {
+        return namedId;
+      }
+      targetId = namedId;
+      normalizer = normalizeRoutingAccountId;
+    }
+  }
+  // Creation uses the owner's target id, never the spelling of a rejected alias.
+  const missingKey = options?.allowMissing ? targetId : undefined;
+  if (!entries) {
+    return missingKey;
+  }
+  const normalize = normalizer ?? normalizeLowercaseStringOrEmpty;
   const normalized = normalize(targetId);
   const lowercaseTarget = normalizeLowercaseStringOrEmpty(targetId);
   let canonicalMatch: string | undefined;
-  for (const key of Object.keys(accounts)) {
+  for (const key of Object.keys(entries)) {
     if (normalizer && isBlockedObjectKey(key)) {
       continue;
     }
@@ -176,7 +190,7 @@ export function resolveAccountKey<T>(
       if (requiredField === undefined) {
         return key;
       }
-      if (canonicalMatch === undefined && hasOwnAliasField(accounts[key], requiredField)) {
+      if (canonicalMatch === undefined && hasOwnAliasField(entries[key], requiredField)) {
         canonicalMatch = key;
       }
     }
